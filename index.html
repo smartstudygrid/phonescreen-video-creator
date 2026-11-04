@@ -60,6 +60,15 @@
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
       background-color: #111827;
     }
+    .checker-alpha {
+      background-image: linear-gradient(45deg, #94a3b8 25%, transparent 25%),
+                        linear-gradient(-45deg, #94a3b8 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #94a3b8 75%),
+                        linear-gradient(-45deg, transparent 75%, #94a3b8 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-color: #e2e8f0;
+    }
     .pulse-record {
       animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
     }
@@ -474,6 +483,14 @@
             </label>
           </div>
           <p id="exportBgHint" class="text-[10px] text-slate-400 mt-2 min-h-[2.5em]"></p>
+          <label class="flex items-center justify-between text-xs text-slate-300 mt-2">
+            <span>Key color for Green screen</span>
+            <select id="chromaColor" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs">
+              <option value="#00ff00">Green</option>
+              <option value="#0000ff">Blue</option>
+              <option value="#ff00ff">Magenta</option>
+            </select>
+          </label>
         </div>
 
         <div class="flex items-center gap-3">
@@ -514,7 +531,8 @@
         </div>
         <h4 class="text-base font-bold text-white mb-1">Video Ready!</h4>
         <p class="text-xs text-slate-400 mb-4">Check the preview below, then download it.</p>
-        <video id="exportPreview" controls playsinline class="w-full max-h-60 rounded-xl bg-black mb-5"></video>
+        <video id="exportPreview" controls playsinline class="w-full max-h-60 rounded-xl bg-black mb-3"></video>
+        <p id="exportAlphaNote" class="text-[11px] mb-4"></p>
 
         <div class="space-y-3">
           <a id="downloadVideoAnchor" download="mockup-video.mp4" class="block w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition text-center cursor-pointer">
@@ -938,7 +956,7 @@
     // 1. Draw Background (Supports uploaded Image, Video, or Presets)
     function renderBackground(w, h) {
       if (state.exportBg === 'transparent') return;
-      if (state.exportBg === 'green') { ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, w, h); return; }
+      if (state.exportBg === 'green') { ctx.fillStyle = state.chromaColor || '#00ff00'; ctx.fillRect(0, 0, w, h); return; }
       if (state.aspectRatio === 'phone') {
         // Transparent / clean dark background for Phone-only export
         ctx.fillStyle = '#0b0f19';
@@ -1766,7 +1784,7 @@
           if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) return m;
         }
       }
-      const selectedRadio = document.querySelector('input[name="exportFormatRadio"]:checked')?.value;
+      const selectedRadio = state.exportBg === 'green' ? 'auto' : document.querySelector('input[name="exportFormatRadio"]:checked')?.value;
       const candidates = (selectedRadio === 'webm') ? [
         'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
@@ -1817,6 +1835,7 @@
 
       // 60 FPS stream from live mockup canvas
       state.exportBg = document.querySelector('input[name="exportBgRadio"]:checked')?.value || 'normal';
+      state.chromaColor = document.getElementById('chromaColor').value;
       applyScale(1); // export at full resolution
       const canvasStream = canvas.captureStream(30);
 
@@ -1876,8 +1895,24 @@
         window._lastExportUrl = videoUrl;
         const pv = document.getElementById('exportPreview');
         pv.src = videoUrl;
-        pv.classList.toggle('checkered-bg', bgMode === 'transparent');
+        pv.classList.toggle('checker-alpha', bgMode === 'transparent');
         pv.classList.toggle('bg-black', bgMode !== 'transparent');
+        const note = document.getElementById('exportAlphaNote');
+        note.textContent = '';
+        if (bgMode === 'transparent') {
+          pv.onloadeddata = () => {
+            try {
+              const c = document.createElement('canvas'); c.width = c.height = 2;
+              const x = c.getContext('2d', { willReadFrequently: true });
+              x.drawImage(pv, 0, 0, 2, 2);
+              const a = x.getImageData(0, 0, 1, 1).data[3];
+              note.className = 'text-[11px] mb-4 ' + (a < 10 ? 'text-emerald-400' : 'text-amber-400');
+              note.textContent = a < 10
+                ? 'Transparency is in this file. Players and editors that ignore WebM alpha will still show black.'
+                : 'This browser did not keep transparency, so the background is solid. Use Green screen instead.';
+            } catch (e) {}
+          };
+        }
         downloadVideoAnchor.href = videoUrl;
         downloadVideoAnchor.target = '_blank';
         downloadVideoAnchor.rel = 'noopener';
@@ -1942,8 +1977,8 @@
 
     const bgHints = {
       normal: "",
-      transparent: "Phone only on a transparent background (WebM with alpha, best in Chrome or Edge). Some editors cannot read WebM alpha; use Green screen for those.",
-      green: "Phone on solid green (#00FF00) as MP4. Apply a Chroma Key effect in any editor."
+      transparent: "Phone only, WebM with alpha. Only Chrome and Edge show the transparency; CapCut, VLC, Windows Media Player and QuickTime show black. Use Green screen for CapCut.",
+      green: "Phone on a solid color as MP4. In CapCut: select the clip, open Cutout, choose Chroma key, pick the color, then raise Intensity until it disappears. Pick Blue or Magenta if your video has green in it."
     };
     document.querySelectorAll('input[name="exportBgRadio"]').forEach(r => r.addEventListener('change', () => {
       document.getElementById('exportBgHint').textContent = bgHints[r.value];
