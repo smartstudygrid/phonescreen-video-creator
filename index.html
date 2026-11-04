@@ -522,7 +522,7 @@
 
     // DOM Elements
     const canvas = document.getElementById('mockupCanvas');
-    const ctx = canvas.getContext('2d');
+    let ctx = canvas.getContext('2d', { alpha: false });
     const video = document.getElementById('sourceVideo');
     const bgVideo = document.getElementById('bgVideo');
     const videoInput = document.getElementById('videoInput');
@@ -594,6 +594,8 @@
     let exportTimer = null;
 
     // --- Helper Functions ---
+    function setText(el, t) { if (el.textContent !== t) el.textContent = t; }
+
     function formatTime(seconds) {
       if (isNaN(seconds) || !seconds) return "00:00";
       const m = Math.floor(seconds / 60);
@@ -703,6 +705,7 @@
     });
 
     clearVideoBtn.addEventListener('click', () => {
+      demoSource = null; demoPaused = false;
       video.pause();
       video.removeAttribute('src');
       video.load();
@@ -735,6 +738,7 @@
     }
 
     function togglePlay() {
+      if (demoSource) { demoPaused = !demoPaused; updatePlayIcons(!demoPaused); return; }
       if (video.paused) {
         video.play().then(() => updatePlayIcons(true)).catch(e => console.error(e));
       } else {
@@ -746,14 +750,7 @@
     quickPlayBtn.addEventListener('click', togglePlay);
     scrubberPlayBtn.addEventListener('click', togglePlay);
 
-    video.addEventListener('timeupdate', () => {
-      if (video.duration) {
-        const progress = (video.currentTime / video.duration) * 100;
-        progressBar.value = progress;
-        currentTimeDisplay.textContent = formatTime(video.currentTime);
-      }
-    });
-
+    
     progressBar.addEventListener('input', (e) => {
       if (video.duration) {
         video.currentTime = (e.target.value / 100) * video.duration;
@@ -1027,21 +1024,19 @@
         // Phone is on the right; text is on the left
         textX = 140;
         align = 'left';
-      } else if (state.aspectRatio === '9:16') {
-        // Vertical Story layout: top badge and headline
+      } else {
         textX = w / 2;
         align = 'center';
-      } else {
-        return; // Center or isometric without text overlay
       }
+      const stacked = !(state.aspectRatio === '16:9' && (state.placement === 'left' || state.placement === 'right'));
 
       ctx.save();
       ctx.textAlign = align;
       ctx.textBaseline = 'top';
 
-      if (state.aspectRatio === '9:16') {
+      if (stacked) {
         // Top text stack for Vertical story (9:16)
-        let cursorY = 120;
+        let cursorY = state.aspectRatio === '9:16' ? 120 : 56;
 
         // Badge pill
         if (state.badge && state.badge.trim() !== '') {
@@ -1068,7 +1063,9 @@
         // Headline
         if (state.headline) {
           ctx.fillStyle = '#ffffff';
-          ctx.font = '700 48px "Space Grotesk"';
+          let fs = 48;
+          ctx.font = `700 ${fs}px "Space Grotesk"`;
+          while (fs > 24 && ctx.measureText(state.headline).width > w - 120) { fs -= 2; ctx.font = `700 ${fs}px "Space Grotesk"`; }
           ctx.fillText(state.headline, textX, cursorY);
           cursorY += 60;
         }
@@ -1158,7 +1155,7 @@
     }
 
     // 3. Draw The Detailed Realistic Phone Frame
-    function renderPhoneMockup(w, h) {
+    function renderPhoneMockup(w, h, mode = 'live') {
       // Calculate Phone Dimensions based on scale & aspect
       const baseHeight = h * 0.82 * state.phoneScale;
       let phoneHeight = (state.aspectRatio === 'phone') ? (h * 0.94) : baseHeight;
@@ -1176,6 +1173,10 @@
         }
       } else if (state.aspectRatio === '9:16') {
         const topPad = 330, availH = h - topPad - 60; // keep phone clear of the headline
+        if (phoneHeight > availH) { phoneHeight = availH; phoneWidth = phoneHeight * 0.495; phoneX = (w - phoneWidth) / 2; }
+        phoneY = topPad + (availH - phoneHeight) / 2;
+      } else if (state.showText && (state.aspectRatio === '1:1' || (state.aspectRatio === '16:9' && (state.placement === 'center' || state.placement === 'isometric')))) {
+        const topPad = 250, availH = h - topPad - 40;
         if (phoneHeight > availH) { phoneHeight = availH; phoneWidth = phoneHeight * 0.495; phoneX = (w - phoneWidth) / 2; }
         phoneY = topPad + (availH - phoneHeight) / 2;
       }
@@ -1197,7 +1198,7 @@
       const bezelThickness = state.phoneModel === 'minimal' ? 8 : 14;
 
       // Outer Bezel Shadow
-      if (state.shadowIntensity > 0) {
+      if (mode !== 'live' && state.shadowIntensity > 0) {
         ctx.save();
         ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
         ctx.shadowBlur = state.shadowIntensity * 1.5;
@@ -1210,7 +1211,7 @@
       }
 
       // Ambient screen glow on the background behind the phone
-      if (state.ambientGlow) {
+      if (mode !== 'live' && state.ambientGlow) {
         ctx.save();
         const glowGrad = ctx.createRadialGradient(
           phoneX + phoneWidth / 2, phoneY + phoneHeight / 2, phoneWidth * 0.3,
@@ -1222,6 +1223,8 @@
         ctx.fillRect(phoneX - 100, phoneY - 100, phoneWidth + 200, phoneHeight + 200);
         ctx.restore();
       }
+
+      if (mode === 'backdrop') { ctx.restore(); return { phoneX, phoneY, phoneWidth, phoneHeight }; }
 
       // Outer Metal / Titanium Frame
       ctx.fillStyle = state.frameColor;
@@ -1254,9 +1257,10 @@
       ctx.fillRect(screenX, screenY, screenW, screenH);
 
       // Draw the user screen recording or demo video onto the mobile screen
-      if (state.hasVideo && video.readyState >= 2) {
-        const vw = video.videoWidth || 1080;
-        const vh = video.videoHeight || 1920;
+      const src = demoSource || video;
+      if (state.hasVideo && (demoSource || video.readyState >= 2)) {
+        const vw = src.videoWidth || src.width || 1080;
+        const vh = src.videoHeight || src.height || 1920;
 
         if (state.fitMode === 'cover') {
           const scale = Math.max(screenW / vw, screenH / vh);
@@ -1264,7 +1268,7 @@
           const dh = vh * scale;
           const dx = screenX + (screenW - dw) / 2;
           const dy = screenY + (screenH - dh) / 2;
-          ctx.drawImage(video, dx, dy, dw, dh);
+          ctx.drawImage(src, dx, dy, dw, dh);
         } else {
           // Contain mode
           const scale = Math.min(screenW / vw, screenH / vh);
@@ -1272,7 +1276,7 @@
           const dh = vh * scale;
           const dx = screenX + (screenW - dw) / 2;
           const dy = screenY + (screenH - dh) / 2;
-          ctx.drawImage(video, dx, dy, dw, dh);
+          ctx.drawImage(src, dx, dy, dw, dh);
         }
       } else {
         // Standby screen artwork if no video loaded
@@ -1359,9 +1363,10 @@
 
     // --- Drag the phone anywhere on the canvas (double-click to reset) ---
     let lastBounds = null, drag = null;
+    let demoSource = null, demoPaused = false, demoRaf = 0;
     function canvasPoint(e) {
       const r = canvas.getBoundingClientRect();
-      return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
+      return { x: (e.clientX - r.left) * targetWidth / r.width, y: (e.clientY - r.top) * targetHeight / r.height };
     }
     function overPhone(pt) {
       const b = lastBounds;
@@ -1382,8 +1387,8 @@
       // keep the phone's center inside the canvas
       const baseCx = b.phoneX + b.phoneWidth / 2 - state.offsetX, baseCy = b.phoneY + b.phoneHeight / 2 - state.offsetY;
       const nx = drag.ox + pt.x - drag.x, ny = drag.oy + pt.y - drag.y;
-      state.offsetX = Math.min(canvas.width - baseCx, Math.max(-baseCx, nx));
-      state.offsetY = Math.min(canvas.height - baseCy, Math.max(-baseCy, ny));
+      state.offsetX = Math.min(targetWidth - baseCx, Math.max(-baseCx, nx));
+      state.offsetY = Math.min(targetHeight - baseCy, Math.max(-baseCy, ny));
     });
     const endDrag = () => { drag = null; canvas.style.cursor = 'grab'; };
     canvas.addEventListener('pointerup', endDrag);
@@ -1392,25 +1397,41 @@
       if (overPhone(canvasPoint(e))) { state.offsetX = state.offsetY = 0; showToast('Phone position reset'); }
     });
 
+    // Background + shadow + glow only change when settings change, so they are cached
+    const baseLayer = { c: document.createElement('canvas'), key: '', img: null };
+    function drawBackdrop() {
+      const w = targetWidth, h = targetHeight;
+      if (state.customBgType === 'video') { renderBackground(w, h); renderPhoneMockup(w, h, 'backdrop'); return; }
+      const key = [w, h, state.aspectRatio, state.placement, state.phoneScale, state.shadowIntensity, state.ambientGlow,
+        state.bgPreset, state.customBgType, state.bgBlur, state.bgDim, state.offsetX, state.offsetY, state.showText, renderScale].join('|');
+      if (baseLayer.key !== key || baseLayer.img !== state.customBgImage) {
+        baseLayer.c.width = Math.round(w * renderScale); baseLayer.c.height = Math.round(h * renderScale);
+        const main = ctx; ctx = baseLayer.c.getContext('2d');
+        ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+        renderBackground(w, h); renderPhoneMockup(w, h, 'backdrop');
+        ctx = main; baseLayer.key = key; baseLayer.img = state.customBgImage;
+      }
+      ctx.drawImage(baseLayer.c, 0, 0, w, h);
+    }
+
     // Main Canvas Render Loop
     function renderMainLoop() {
       if (video.duration && isFinite(video.duration) && !video.seeking && document.activeElement !== progressBar) {
         progressBar.value = (video.currentTime / video.duration) * 100;
-        currentTimeDisplay.textContent = formatTime(video.currentTime);
+        setText(currentTimeDisplay, formatTime(video.currentTime));
       }
       // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+      ctx.clearRect(0, 0, targetWidth, targetHeight);
 
       // 1. Render Background
-      renderBackground(canvas.width, canvas.height);
-
-      // 2. Render Phone Mockup
-      const bounds = renderPhoneMockup(canvas.width, canvas.height);
+      drawBackdrop();
+      const bounds = renderPhoneMockup(targetWidth, targetHeight, 'live');
       lastBounds = bounds;
 
       // 3. Render Text Overlays
       if (bounds) {
-        renderTextContent(bounds.phoneX, bounds.phoneY, bounds.phoneWidth, bounds.phoneHeight, canvas.width, canvas.height);
+        renderTextContent(bounds.phoneX, bounds.phoneY, bounds.phoneWidth, bounds.phoneHeight, targetWidth, targetHeight);
       }
 
       requestAnimationFrame(renderMainLoop);
@@ -1435,12 +1456,19 @@
         canvasDimLabel.textContent = "620 × 1240 (Fitted Phone)";
       }
       state.offsetX = state.offsetY = 0;
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      fitCanvas();
+      applyScale(previewScale());
     }
 
     // Fit canvas inside the stage with pixel sizes: no scrolling, ever
+    let renderScale = 1;
+    function previewScale() { return Math.min(1, 1000 / Math.max(targetWidth, targetHeight)); }
+    function applyScale(sc) {
+      renderScale = sc;
+      canvas.width = Math.round(targetWidth * sc);
+      canvas.height = Math.round(targetHeight * sc);
+      fitCanvas();
+    }
+
     function fitCanvas() {
       const st = document.getElementById('stageContainer');
       const pad = window.innerWidth >= 1024 ? 32 : 16;
@@ -1461,6 +1489,7 @@
       }
 
       const fileURL = URL.createObjectURL(file);
+      demoSource = null; demoPaused = false;
       video.srcObject = null;
       video.src = fileURL;
       video.loop = state.isLooping;
@@ -1497,9 +1526,13 @@
       demoCanvas.height = 1480;
       const dCtx = demoCanvas.getContext('2d');
 
-      let tick = 0;
+      cancelAnimationFrame(demoRaf);
+      let tick = 0, last = performance.now();
       function drawDemoFrame() {
-        tick += 0.035;
+        // time-based so speed doesn't depend on the frame rate
+        const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
+        last = now;
+        if (!demoPaused) tick += dt * 2.1;
         // Background
         const dGrad = dCtx.createLinearGradient(0, 0, 0, 1480);
         dGrad.addColorStop(0, '#090d16');
@@ -1582,13 +1615,13 @@
         dCtx.textAlign = 'center';
         dCtx.fillText("Completed 6 Tasks Today!", 360, 1146 + bounce);
 
-        requestAnimationFrame(drawDemoFrame);
+        demoRaf = requestAnimationFrame(drawDemoFrame);
       }
       drawDemoFrame();
 
-      const stream = demoCanvas.captureStream(30);
-      video.srcObject = stream;
-      video.play().then(() => {
+      demoSource = demoCanvas; demoPaused = false;
+      video.pause(); video.removeAttribute('src'); video.srcObject = null;
+      Promise.resolve().then(() => {
         state.hasVideo = true;
         videoFilename.textContent = "Built-in Screen Recording Demo";
         videoDuration.textContent = "Live";
@@ -1675,6 +1708,7 @@
       exportProgressState.classList.remove('hidden');
 
       // 60 FPS stream from live mockup canvas
+      applyScale(1); // export at full resolution
       const canvasStream = canvas.captureStream(30);
 
       // Attempt to include audio track if source video has audio
@@ -1714,6 +1748,7 @@
 
       mediaRecorder.onstop = () => {
         video.loop = state.isLooping;
+        applyScale(previewScale());
         if (recordedChunks.length === 0) {
           showToast("Export failed: no frames were recorded.", true);
           exportInitialState.classList.remove('hidden');
@@ -1760,16 +1795,28 @@
       video.play().catch(() => {});
 
       const startTimestamp = Date.now();
+      const isLive = !(video.duration && isFinite(video.duration));
+      let finishing = false;
       exportTimer = setInterval(() => {
         const elapsed = Date.now() - startTimestamp;
-        const progress = Math.min(100, Math.floor((elapsed / totalMs) * 100));
+        // Follow the video's own playback position, not the wall clock, so slow
+        // rendering can't cut the export short.
+        const pos = isLive ? elapsed / 1000 : video.currentTime;
+        const progress = Math.min(100, Math.floor((pos / totalSec) * 100));
 
         exportProgressBar.style.width = `${progress}%`;
-        exportPercent.textContent = `${progress}%`;
-        exportFrameCount.textContent = `${formatTime(elapsed / 1000)} / ${formatTime(totalSec)}`;
+        setText(exportPercent, `${progress}%`);
+        setText(exportFrameCount, `${formatTime(pos)} / ${formatTime(totalSec)}`);
 
-        if (elapsed >= totalMs || video.ended) {
-          stopExportRecording(false);
+        if (!isLive && video.paused && !video.ended) video.play().catch(() => {});
+
+        const done = isLive ? elapsed >= totalMs
+          : (video.ended || pos >= totalSec - 0.05 || elapsed > totalMs * 4 + 5000);
+        if (done && !finishing) {
+          finishing = true;
+          clearInterval(exportTimer);
+          exportTimer = null;
+          setTimeout(() => stopExportRecording(false), 400); // let the last frames flush
         }
       }, 100);
 
