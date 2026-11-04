@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MockupStudio - Mobile Video Mockup Generator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['"Space Grotesk"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+    .checkered-bg {
+      background-image: linear-gradient(45deg, #1f2937 25%, transparent 25%), 
+                        linear-gradient(-45deg, #1f2937 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #1f2937 75%), 
+                        linear-gradient(-45deg, transparent 75%, #1f2937 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      background-color: #111827;
+    }
+    .pulse-record {
+      animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-[100dvh] flex flex-col font-sans antialiased overflow-hidden selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40 px-4 lg:px-8 py-3.5 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+        <i class="ph-bold ph-device-mobile-camera text-2xl text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight flex items-center gap-2">
+          MockupStudio <span class="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Video Pro</span>
+        </h1>
+        <p class="text-xs text-slate-400 hidden sm:block">Turn screen recordings into stunning marketing showreels</p>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <button id="quickPlayBtn" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+        <i id="playIcon" class="ph-bold ph-play text-sm"></i>
+        <span id="playText">Play</span>
+      </button>
+
+      <button id="exportModalBtn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white text-xs font-bold tracking-wide flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition transform active:scale-95">
+        <i class="ph-bold ph-export text-base"></i>
+        <span>Export Video</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+    
+    <!-- Left Sidebar: Controls & Customization (Independently Scrollable) -->
+    <aside class="w-full lg:w-[420px] xl:w-[460px] border-r border-slate-800 bg-slate-900/40 flex flex-col min-h-0 overflow-y-auto overscroll-contain lg:shrink-0 max-lg:flex-1 max-lg:order-2 z-10">
+      
+      <!-- Video Upload / Source Section -->
+      <div class="p-5 border-b border-slate-800/80">
+        <label class="block text-xs font-bold tracking-wider text-slate-400 uppercase mb-2">1. Screen Recording Source</label>
+        
+        <div id="dropZone" class="relative group cursor-pointer border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-4 text-center transition bg-slate-900/60 hover:bg-indigo-950/20 flex flex-col items-center justify-center gap-2">
+          <input type="file" id="videoInput" accept="video/mp4,video/webm,video/quicktime,video/mov" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
+          <div class="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-400 group-hover:scale-110 flex items-center justify-center transition">
+            <i class="ph-duotone ph-video text-2xl"></i>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-slate-200">Click or Drag & Drop video here</p>
+            <p class="text-xs text-slate-400 mt-0.5">MP4, WebM or MOV (Up to 4K)</p>
+          </div>
+          <button type="button" id="loadSampleBtn" class="mt-1 text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline underline-offset-2 z-20">
+            Or load built-in demo screen recording
+          </button>
+        </div>
+
+        <!-- Video Info Bar -->
+        <div id="videoMeta" class="mt-3 hidden items-center justify-between text-xs bg-slate-800/60 px-3 py-2 rounded-xl border border-slate-700/60">
+          <div class="flex items-center gap-2 truncate">
+            <i class="ph-fill ph-file-video text-indigo-400 text-sm"></i>
+            <span id="videoFilename" class="truncate font-medium text-slate-300">recording.mp4</span>
+          </div>
+          <div class="flex items-center gap-2 text-slate-400 shrink-0">
+            <span id="videoDuration">00:00</span>
+            <button id="clearVideoBtn" title="Remove video" class="text-slate-400 hover:text-rose-400 transition ml-1">
+              <i class="ph-bold ph-trash text-sm"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Form -->
+      <div class="p-5 space-y-6 flex-1">
+
+        <!-- 2. Canvas Ratio & Layout Preset -->
+        <div>
+          <label class="block text-xs font-bold tracking-wider text-slate-400 uppercase mb-2">2. Aspect Ratio & Layout</label>
+          
+          <div class="grid grid-cols-4 gap-2 mb-3">
+            <button type="button" data-ratio="16:9" class="ratio-btn active-btn p-2.5 rounded-xl border border-indigo-500 bg-indigo-500/15 text-white flex flex-col items-center gap-1 transition">
+              <span class="text-xs font-bold">16:9</span>
+              <span class="text-[10px] text-slate-400">YouTube / Web</span>
+            </button>
+            <button type="button" data-ratio="9:16" class="ratio-btn p-2.5 rounded-xl border border-slate-800 bg-slate-800/40 hover:bg-slate-800 text-slate-300 flex flex-col items-center gap-1 transition">
+              <span class="text-xs font-bold">9:16</span>
+              <span class="text-[10px] text-slate-400">TikTok / Reels</span>
+            </button>
+            <button type="button" data-ratio="1:1" class="ratio-btn p-2.5 rounded-xl border border-slate-800 bg-slate-800/40 hover:bg-slate-800 text-slate-300 flex flex-col items-center gap-1 transition">
+              <span class="text-xs font-bold">1:1</span>
+              <span class="text-[10px] text-slate-400">Square Post</span>
+            </button>
+            <button type="button" data-ratio="phone" class="ratio-btn p-2.5 rounded-xl border border-slate-800 bg-slate-800/40 hover:bg-slate-800 text-slate-300 flex flex-col items-center gap-1 transition">
+              <span class="text-xs font-bold">Fitted</span>
+              <span class="text-[10px] text-slate-400">Phone Only</span>
+            </button>
+          </div>
+
+          <!-- Phone Placement inside ratio -->
+          <div id="placementContainer" class="space-y-1.5">
+            <span class="text-xs text-slate-400 font-medium">Placement inside canvas:</span>
+            <div class="grid grid-cols-4 gap-2">
+              <button type="button" data-placement="center" class="placement-btn active-btn text-xs py-2 px-2 rounded-lg border border-indigo-500 bg-indigo-500/15 text-white font-medium flex items-center justify-center gap-1">
+                <i class="ph-bold ph-align-center-horizontal"></i> Center
+              </button>
+              <button type="button" data-placement="left" class="placement-btn text-xs py-2 px-2 rounded-lg border border-slate-800 bg-slate-800/40 hover:bg-slate-800 text-slate-300 font-medium flex items-center justify-center gap-1">
+                <i class="ph-bold ph-align-left"></i> Left Split
+              </button>
+              <button type="button" data-placement="right" class="placement-btn text-xs py-2 px-2 rounded-lg border border-slate-800 bg-slate-800/40 hover:bg-slate-800 text-slate-300 font-medium flex items-center justify-center gap-1">
+                <i class="ph-bold ph-align-right"></i> Right Split
+              </button>
+              <button type="button" data-placement="isometric" class="placement-btn text-xs py-2 px-2 rounded-lg border border-slate-800 bg-slate-800/40 hover:bg-slate-800 text-slate-300 font-medium flex items-center justify-center gap-1">
+                <i class="ph-bold ph-cube"></i> 3D Tilt
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Phone Device Model -->
+        <div>
+          <label class="block text-xs font-bold tracking-wider text-slate-400 uppercase mb-2">3. Phone Frame Model</label>
+          <div class="grid grid-cols-2 gap-2.5">
+            <!-- iPhone Pro -->
+            <label class="cursor-pointer border border-indigo-500 bg-indigo-950/20 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="iphone15" checked class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">iPhone Pro</p>
+                <p class="text-[10px] text-slate-400">Dynamic Island & Bezel</p>
+              </div>
+            </label>
+
+            <!-- Android Flagship -->
+            <label class="cursor-pointer border border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="android" class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">Pixel / Galaxy</p>
+                <p class="text-[10px] text-slate-400">Punch-hole camera</p>
+              </div>
+            </label>
+
+            <!-- Classic Notch -->
+            <label class="cursor-pointer border border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="notch" class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">Classic Notch</p>
+                <p class="text-[10px] text-slate-400">Traditional sensor notch</p>
+              </div>
+            </label>
+
+            <!-- Minimalist / Clay -->
+            <label class="cursor-pointer border border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="minimal" class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">Minimal Border</p>
+                <p class="text-[10px] text-slate-400">Edge-to-edge sleek outline</p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Device Finish / Color -->
+          <div class="mt-3 flex items-center justify-between bg-slate-900/70 p-3 rounded-xl border border-slate-800">
+            <span class="text-xs font-medium text-slate-300">Device Hardware Color</span>
+            <div class="flex items-center gap-2">
+              <button type="button" data-color="#1c1d1f" class="color-picker-btn w-6 h-6 rounded-full bg-[#1c1d1f] ring-2 ring-indigo-500 border border-slate-600 transition" title="Titanium Black"></button>
+              <button type="button" data-color="#3d4044" class="color-picker-btn w-6 h-6 rounded-full bg-[#3d4044] border border-slate-600 transition" title="Natural Titanium"></button>
+              <button type="button" data-color="#e2e8f0" class="color-picker-btn w-6 h-6 rounded-full bg-slate-200 border border-slate-400 transition" title="Silver / White"></button>
+              <button type="button" data-color="#312e81" class="color-picker-btn w-6 h-6 rounded-full bg-indigo-900 border border-indigo-400 transition" title="Deep Navy"></button>
+              <input type="color" id="customFrameColor" value="#1c1d1f" class="w-6 h-6 rounded-full bg-transparent cursor-pointer border-0 p-0 overflow-hidden" title="Custom color">
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Background Customization -->
+        <div>
+          <label class="block text-xs font-bold tracking-wider text-slate-400 uppercase mb-2">4. Background & Atmosphere</label>
+          
+          <div class="space-y-3">
+            <!-- Preset Swatches -->
+            <div class="grid grid-cols-5 gap-2">
+              <button type="button" data-bg="gradient-violet" class="bg-preset-btn active-bg h-9 rounded-lg bg-gradient-to-tr from-indigo-950 via-slate-900 to-purple-900 ring-2 ring-indigo-500 transition" title="Midnight Nebula"></button>
+              <button type="button" data-bg="gradient-sunset" class="bg-preset-btn h-9 rounded-lg bg-gradient-to-tr from-rose-900 via-amber-900 to-slate-900 border border-slate-700 transition" title="Warm Dusk"></button>
+              <button type="button" data-bg="gradient-emerald" class="bg-preset-btn h-9 rounded-lg bg-gradient-to-tr from-emerald-950 via-slate-900 to-teal-900 border border-slate-700 transition" title="Emerald Glow"></button>
+              <button type="button" data-bg="gradient-modern" class="bg-preset-btn h-9 rounded-lg bg-gradient-to-br from-slate-900 via-slate-950 to-black border border-slate-700 transition" title="Studio Dark"></button>
+              <button type="button" data-bg="gradient-mesh" class="bg-preset-btn h-9 rounded-lg bg-gradient-to-r from-violet-600 via-pink-500 to-amber-400 border border-slate-700 transition" title="Vibrant Mesh"></button>
+            </div>
+
+            <!-- Upload Custom Background (Image / Video) -->
+            <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-300">Custom Image / Video BG</span>
+                <button type="button" id="clearBgMediaBtn" class="text-[11px] text-rose-400 hover:text-rose-300 hidden">Remove</button>
+              </div>
+              <label class="relative flex items-center justify-center gap-2 p-2.5 rounded-lg border border-dashed border-slate-700 hover:border-indigo-500 bg-slate-950/40 cursor-pointer transition text-xs text-slate-300 hover:text-white">
+                <i class="ph-bold ph-image text-base text-indigo-400"></i>
+                <span id="bgUploadLabel">Upload background file (PNG, JPG, MP4)</span>
+                <input type="file" id="bgFileInput" accept="image/*,video/mp4,video/webm" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+              </label>
+
+              <!-- Optional Background Dim / Blur Controls when custom media active -->
+              <div id="customBgControls" class="hidden pt-2 grid grid-cols-2 gap-2 text-xs text-slate-400">
+                <label class="flex flex-col gap-1">
+                  <span>BG Blur: <span id="bgBlurVal" class="text-slate-200">0px</span></span>
+                  <input type="range" id="bgBlurInput" min="0" max="25" value="0" class="accent-indigo-500">
+                </label>
+                <label class="flex flex-col gap-1">
+                  <span>Darken Overlay: <span id="bgDimVal" class="text-slate-200">30%</span></span>
+                  <input type="range" id="bgDimInput" min="0" max="90" value="30" class="accent-indigo-500">
+                </label>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <label class="flex-1 text-xs text-slate-300 flex items-center justify-between bg-slate-900/70 px-3 py-2 rounded-xl border border-slate-800">
+                <span>Shadow Blur</span>
+                <input type="range" id="shadowIntensity" min="0" max="60" value="35" class="w-24 accent-indigo-500">
+              </label>
+
+              <label class="flex-1 text-xs text-slate-300 flex items-center justify-between bg-slate-900/70 px-3 py-2 rounded-xl border border-slate-800">
+                <span>Phone Scale</span>
+                <input type="range" id="phoneScale" min="60" max="120" value="95" class="w-24 accent-indigo-500">
+              </label>
+            </div>
+
+            <!-- Background blur ambient glow toggle -->
+            <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer">
+              <span class="text-xs text-slate-300">Ambient Screen Reflection / Glow</span>
+              <input type="checkbox" id="ambientGlowToggle" checked class="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700 focus:ring-indigo-500">
+            </label>
+          </div>
+        </div>
+
+        <!-- 5. Headline / Text Overlay (Visible on Split layouts or can be toggled) -->
+        <div id="textOverlaySection">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-bold tracking-wider text-slate-400 uppercase">5. Text & Marketing Copy</label>
+            <label class="text-xs text-indigo-400 flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="showTextToggle" checked class="w-3.5 h-3.5 rounded accent-indigo-500">
+              <span>Show Copy</span>
+            </label>
+          </div>
+
+          <div id="textInputsWrapper" class="space-y-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-slate-400 font-medium">Badge / Tagline Pill</span>
+              <input type="text" id="badgeInput" value="NEW VERSION 2.0" class="w-48 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] uppercase tracking-wider text-indigo-300 focus:outline-none focus:border-indigo-500 font-semibold">
+            </div>
+            <div>
+              <span class="text-[11px] text-slate-400 font-medium">Main Headline</span>
+              <input type="text" id="headlineInput" value="Track Habits. Boost Focus." class="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold">
+            </div>
+            <div>
+              <span class="text-[11px] text-slate-400 font-medium">Subtitle or Description</span>
+              <input type="text" id="subHeadlineInput" value="Available now on the App Store & Google Play" class="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Video Fit Mode -->
+        <div class="border-t border-slate-800 pt-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-300">Screen Video Fit</span>
+            <div class="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+              <button type="button" id="fitCover" class="px-2.5 py-1 text-xs rounded font-medium bg-indigo-600 text-white">Cover (Full Screen)</button>
+              <button type="button" id="fitContain" class="px-2.5 py-1 text-xs rounded font-medium text-slate-400 hover:text-white">Contain</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Right Canvas Workspace & Live Player -->
+    <section class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden min-h-0 min-w-0 max-lg:order-1 max-lg:flex-none max-lg:h-[46dvh]">
+      
+      <!-- Stage Toolbar -->
+      <div class="px-6 py-2.5 border-b border-slate-800/80 bg-slate-900/30 flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1.5 font-medium text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Canvas Preview
+          </span>
+          <span id="canvasDimLabel" class="bg-slate-800 px-2 py-0.5 rounded text-[11px] text-slate-400">1920 × 1080 (16:9)</span>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Playback time status -->
+          <div class="flex items-center gap-1.5 font-mono text-xs">
+            <span id="currentTimeDisplay" class="text-indigo-300">0:00</span>
+            <span>/</span>
+            <span id="totalTimeDisplay">0:00</span>
+          </div>
+
+          <!-- Audio toggle -->
+          <button id="toggleAudioBtn" title="Toggle Audio" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <i id="audioIcon" class="ph-bold ph-speaker-slash text-base"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Stage Canvas Area -->
+      <div class="flex-1 min-h-0 checkered-bg overflow-hidden relative" id="stageContainer">
+        <!-- Canvas is dynamically scaled to fit nicely while maintaining high resolution -->
+        <canvas id="mockupCanvas" class="absolute shadow-2xl shadow-black/80 rounded-xl"></canvas>
+      </div>
+
+      <!-- Bottom Timeline Playback Scrubber -->
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-900/80 backdrop-blur flex items-center gap-4 shrink-0">
+        <button id="scrubberPlayBtn" class="w-9 h-9 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow transition shrink-0">
+          <i id="scrubberIcon" class="ph-fill ph-play text-sm"></i>
+        </button>
+
+        <div class="flex-1 flex items-center gap-3">
+          <input type="range" id="progressBar" min="0" max="100" value="0" step="0.1" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+        </div>
+
+        <button id="loopToggleBtn" class="flex items-center gap-1.5 text-xs text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/30">
+          <i class="ph-bold ph-repeat text-sm"></i>
+          <span>Loop Video</span>
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Hidden HTML5 Video element used as texture source for Canvas -->
+  <video id="sourceVideo" playsinline muted loop preload="auto" crossorigin="anonymous" style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none"></video>
+  <!-- Hidden Background Video element if user uploads video background -->
+  <video id="bgVideo" playsinline loop muted preload="auto" crossorigin="anonymous" style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none"></video>
+
+  <!-- Export Processing Modal -->
+  <div id="exportModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-center">
+      
+      <div id="exportInitialState">
+        <div class="w-14 h-14 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-500/30">
+          <i class="ph-bold ph-film-slate text-3xl"></i>
+        </div>
+        
+        <h3 class="text-lg font-bold text-white mb-1">Export Mockup Video</h3>
+        <p class="text-xs text-slate-400 mb-5">Records the entire canvas into a high-compatibility playable video file.</p>
+
+        <div class="space-y-3 mb-6 text-left">
+          <label class="block text-xs font-semibold text-slate-300">Format & Compatibility</label>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <label class="p-3 rounded-xl border border-indigo-500 bg-indigo-500/10 cursor-pointer flex flex-col">
+              <span class="font-bold text-white flex items-center gap-1.5">
+                <input type="radio" name="exportFormatRadio" value="auto" checked class="accent-indigo-500">
+                MP4 / WebM High
+              </span>
+              <span class="text-[10px] text-slate-400 mt-1">Direct hardware encoded for smooth playback</span>
+            </label>
+            <label class="p-3 rounded-xl border border-slate-800 bg-slate-800/40 cursor-pointer flex flex-col">
+              <span class="font-bold text-slate-300 flex items-center gap-1.5">
+                <input type="radio" name="exportFormatRadio" value="webm" class="accent-indigo-500">
+                Universal WebM
+              </span>
+              <span class="text-[10px] text-slate-400 mt-1">Fallback supported by all browser platforms</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button type="button" id="cancelExportBtn" class="flex-1 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold">
+            Cancel
+          </button>
+          <button type="button" id="startRenderBtn" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white text-xs font-bold shadow-lg shadow-indigo-500/25">
+            Start Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Export In-Progress State -->
+      <div id="exportProgressState" class="hidden py-4">
+        <div class="relative w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+          <i class="ph-bold ph-video-camera text-2xl text-indigo-400 pulse-record"></i>
+        </div>
+        <h4 class="text-base font-bold text-white mb-1">Rendering Mockup Video...</h4>
+        <p class="text-xs text-slate-400 mb-4">Please do not switch tabs. Video is rendering frame-by-frame.</p>
+
+        <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden mb-2">
+          <div id="exportProgressBar" class="bg-gradient-to-r from-indigo-500 to-pink-500 h-2.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+        </div>
+        <div class="flex justify-between text-xs text-slate-400 font-mono mb-4">
+          <span id="exportPercent">0%</span>
+          <span id="exportFrameCount">Recording...</span>
+        </div>
+        <button type="button" id="forceStopRenderBtn" class="text-xs text-rose-400 hover:text-rose-300 font-semibold underline">
+          Stop & Finish Early
+        </button>
+      </div>
+
+      <!-- Export Success State -->
+      <div id="exportSuccessState" class="hidden py-4">
+        <div class="w-14 h-14 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+          <i class="ph-bold ph-check-circle text-3xl"></i>
+        </div>
+        <h4 class="text-base font-bold text-white mb-1">Video Ready!</h4>
+        <p class="text-xs text-slate-400 mb-4">Check the preview below, then download it.</p>
+        <video id="exportPreview" controls playsinline class="w-full max-h-60 rounded-xl bg-black mb-5"></video>
+
+        <div class="space-y-3">
+          <a id="downloadVideoAnchor" download="mockup-video.mp4" class="block w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition text-center cursor-pointer">
+            <i class="ph-bold ph-download-simple inline-block mr-1"></i> Download Playable Video
+          </a>
+          <button type="button" id="closeExportModalBtn" class="block w-full py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 text-xs font-medium">
+            Done
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 bg-slate-800 border border-slate-700 text-white text-xs px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300">
+    <i id="toastIcon" class="ph-fill ph-check-circle text-emerald-400 text-base"></i>
+    <span id="toastMsg">Action complete</span>
+  </div>
+
+  <script>
+    /**
+     * MockupStudio Core Application
+     * Handles canvas compositing, phone frame rendering, video playback, and client-side webm/mp4 recording.
+     */
+
+    // App State Configuration
+    const state = {
+      aspectRatio: '16:9',      // '16:9', '9:16', '1:1', 'phone'
+      placement: 'center',       // 'center', 'left', 'right', 'isometric'
+      phoneModel: 'iphone15',    // 'iphone15', 'android', 'notch', 'minimal'
+      frameColor: '#1c1d1f',    // Bezel hardware color
+      bgPreset: 'gradient-violet',// gradient-violet, gradient-sunset, gradient-emerald, gradient-modern, gradient-mesh
+      customBgType: null,        // null, 'image', 'video'
+      customBgImage: null,       // Image object
+      bgBlur: 0,
+      bgDim: 0.3,
+      shadowIntensity: 35,
+      phoneScale: 0.95,
+      fitMode: 'cover',          // 'cover' or 'contain'
+      ambientGlow: true,
+      showText: true,
+      headline: 'Track Habits. Boost Focus.',
+      subHeadline: 'Available now on the App Store & Google Play',
+      badge: 'NEW VERSION 2.0',
+      isLooping: true,
+      isMuted: true,
+      hasVideo: false,
+      isRecording: false,
+      offsetX: 0,           // manual phone drag offset (canvas px)
+      offsetY: 0
+    };
+
+    // DOM Elements
+    const canvas = document.getElementById('mockupCanvas');
+    const ctx = canvas.getContext('2d');
+    const video = document.getElementById('sourceVideo');
+    const bgVideo = document.getElementById('bgVideo');
+    const videoInput = document.getElementById('videoInput');
+    const dropZone = document.getElementById('dropZone');
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    const videoMeta = document.getElementById('videoMeta');
+    const videoFilename = document.getElementById('videoFilename');
+    const videoDuration = document.getElementById('videoDuration');
+    const clearVideoBtn = document.getElementById('clearVideoBtn');
+
+    // Custom Background elements
+    const bgFileInput = document.getElementById('bgFileInput');
+    const bgUploadLabel = document.getElementById('bgUploadLabel');
+    const clearBgMediaBtn = document.getElementById('clearBgMediaBtn');
+    const customBgControls = document.getElementById('customBgControls');
+    const bgBlurInput = document.getElementById('bgBlurInput');
+    const bgBlurVal = document.getElementById('bgBlurVal');
+    const bgDimInput = document.getElementById('bgDimInput');
+    const bgDimVal = document.getElementById('bgDimVal');
+
+    // Controls
+    const quickPlayBtn = document.getElementById('quickPlayBtn');
+    const playIcon = document.getElementById('playIcon');
+    const playText = document.getElementById('playText');
+    const scrubberPlayBtn = document.getElementById('scrubberPlayBtn');
+    const scrubberIcon = document.getElementById('scrubberIcon');
+    const progressBar = document.getElementById('progressBar');
+    const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+    const totalTimeDisplay = document.getElementById('totalTimeDisplay');
+    const toggleAudioBtn = document.getElementById('toggleAudioBtn');
+    const audioIcon = document.getElementById('audioIcon');
+    const loopToggleBtn = document.getElementById('loopToggleBtn');
+    const canvasDimLabel = document.getElementById('canvasDimLabel');
+
+    // Form inputs
+    const shadowIntensityInput = document.getElementById('shadowIntensity');
+    const phoneScaleInput = document.getElementById('phoneScale');
+    const ambientGlowToggle = document.getElementById('ambientGlowToggle');
+    const showTextToggle = document.getElementById('showTextToggle');
+    const headlineInput = document.getElementById('headlineInput');
+    const subHeadlineInput = document.getElementById('subHeadlineInput');
+    const badgeInput = document.getElementById('badgeInput');
+    const fitCover = document.getElementById('fitCover');
+    const fitContain = document.getElementById('fitContain');
+    const customFrameColor = document.getElementById('customFrameColor');
+
+    // Export Modal Elements
+    const exportModalBtn = document.getElementById('exportModalBtn');
+    const exportModal = document.getElementById('exportModal');
+    const exportInitialState = document.getElementById('exportInitialState');
+    const exportProgressState = document.getElementById('exportProgressState');
+    const exportSuccessState = document.getElementById('exportSuccessState');
+    const exportProgressBar = document.getElementById('exportProgressBar');
+    const exportPercent = document.getElementById('exportPercent');
+    const exportFrameCount = document.getElementById('exportFrameCount');
+    const startRenderBtn = document.getElementById('startRenderBtn');
+    const cancelExportBtn = document.getElementById('cancelExportBtn');
+    const forceStopRenderBtn = document.getElementById('forceStopRenderBtn');
+    const closeExportModalBtn = document.getElementById('closeExportModalBtn');
+    const downloadVideoAnchor = document.getElementById('downloadVideoAnchor');
+
+    // Canvas target dimensions
+    let targetWidth = 1920;
+    let targetHeight = 1080;
+
+    // MediaRecorder instance
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let exportTimer = null;
+
+    // --- Helper Functions ---
+    function formatTime(seconds) {
+      if (isNaN(seconds) || !seconds) return "00:00";
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      toastMsg.textContent = message;
+      if (isError) {
+        toastIcon.className = "ph-fill ph-warning-circle text-rose-400 text-base";
+      } else {
+        toastIcon.className = "ph-fill ph-check-circle text-emerald-400 text-base";
+      }
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // --- Custom Background Image / Video Upload Handling ---
+    bgFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            state.customBgImage = img;
+            state.customBgType = 'image';
+            bgVideo.pause();
+            bgVideo.src = '';
+            bgUploadLabel.textContent = file.name;
+            clearBgMediaBtn.classList.remove('hidden');
+            customBgControls.classList.remove('hidden');
+            showToast("Background image applied!");
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      } else if (file.type.startsWith('video/')) {
+        const url = URL.createObjectURL(file);
+        bgVideo.src = url;
+        bgVideo.load();
+        bgVideo.onloadedmetadata = () => {
+          state.customBgType = 'video';
+          state.customBgImage = null;
+          bgVideo.play().catch(() => {});
+          bgUploadLabel.textContent = file.name;
+          clearBgMediaBtn.classList.remove('hidden');
+          customBgControls.classList.remove('hidden');
+          showToast("Background video applied!");
+        };
+      } else {
+        showToast("Please upload an image or video file.", true);
+      }
+    });
+
+    clearBgMediaBtn.addEventListener('click', () => {
+      state.customBgType = null;
+      state.customBgImage = null;
+      bgVideo.pause();
+      bgVideo.src = '';
+      bgFileInput.value = '';
+      bgUploadLabel.textContent = 'Upload background file (PNG, JPG, MP4)';
+      clearBgMediaBtn.classList.add('hidden');
+      customBgControls.classList.add('hidden');
+      showToast("Custom background removed; using preset.");
+    });
+
+    bgBlurInput.addEventListener('input', (e) => {
+      state.bgBlur = parseInt(e.target.value, 10);
+      bgBlurVal.textContent = `${state.bgBlur}px`;
+    });
+
+    bgDimInput.addEventListener('input', (e) => {
+      state.bgDim = parseInt(e.target.value, 10) / 100;
+      bgDimVal.textContent = `${e.target.value}%`;
+    });
+
+    // Drag and Drop
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-indigo-500', 'bg-indigo-950/40');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/40');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/40');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleVideoFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    loadSampleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      createDemoVideo();
+    });
+
+    clearVideoBtn.addEventListener('click', () => {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      progressBar.value = 0;
+      currentTimeDisplay.textContent = '0:00';
+      totalTimeDisplay.textContent = '0:00';
+      if (video.srcObject) {
+        const tracks = video.srcObject.getTracks();
+        tracks.forEach(t => t.stop());
+        video.srcObject = null;
+      }
+      state.hasVideo = false;
+      videoMeta.classList.add('hidden');
+      videoMeta.classList.remove('flex');
+      updatePlayIcons(false);
+      showToast("Video source removed.");
+    });
+
+    // --- Playback Controls ---
+    function updatePlayIcons(isPlaying) {
+      if (isPlaying) {
+        playIcon.className = "ph-bold ph-pause text-sm";
+        playText.textContent = "Pause";
+        scrubberIcon.className = "ph-fill ph-pause text-sm";
+      } else {
+        playIcon.className = "ph-bold ph-play text-sm";
+        playText.textContent = "Play";
+        scrubberIcon.className = "ph-fill ph-play text-sm";
+      }
+    }
+
+    function togglePlay() {
+      if (video.paused) {
+        video.play().then(() => updatePlayIcons(true)).catch(e => console.error(e));
+      } else {
+        video.pause();
+        updatePlayIcons(false);
+      }
+    }
+
+    quickPlayBtn.addEventListener('click', togglePlay);
+    scrubberPlayBtn.addEventListener('click', togglePlay);
+
+    video.addEventListener('timeupdate', () => {
+      if (video.duration) {
+        const progress = (video.currentTime / video.duration) * 100;
+        progressBar.value = progress;
+        currentTimeDisplay.textContent = formatTime(video.currentTime);
+      }
+    });
+
+    progressBar.addEventListener('input', (e) => {
+      if (video.duration) {
+        video.currentTime = (e.target.value / 100) * video.duration;
+      }
+    });
+
+    toggleAudioBtn.addEventListener('click', () => {
+      state.isMuted = !state.isMuted;
+      video.muted = state.isMuted;
+      if (state.isMuted) {
+        audioIcon.className = "ph-bold ph-speaker-slash text-base";
+        showToast("Audio muted");
+      } else {
+        audioIcon.className = "ph-bold ph-speaker-high text-base text-indigo-400";
+        showToast("Audio enabled");
+      }
+    });
+
+    loopToggleBtn.addEventListener('click', () => {
+      state.isLooping = !state.isLooping;
+      video.loop = state.isLooping;
+      if (state.isLooping) {
+        loopToggleBtn.classList.remove('opacity-60');
+        showToast("Video looping on");
+      } else {
+        loopToggleBtn.classList.add('opacity-60');
+        showToast("Video looping off");
+      }
+    });
+
+    // --- UI Interactions & Settings Sync ---
+    // Aspect Ratio Buttons
+    document.querySelectorAll('.ratio-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.ratio-btn').forEach(b => {
+          b.classList.remove('active-btn', 'border-indigo-500', 'bg-indigo-500/15', 'text-white');
+          b.classList.add('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+        });
+        btn.classList.add('active-btn', 'border-indigo-500', 'bg-indigo-500/15', 'text-white');
+        btn.classList.remove('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+        state.aspectRatio = btn.getAttribute('data-ratio');
+        updateCanvasDimensions();
+      });
+    });
+
+    // Placement Buttons
+    document.querySelectorAll('.placement-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.placement-btn').forEach(b => {
+          b.classList.remove('active-btn', 'border-indigo-500', 'bg-indigo-500/15', 'text-white');
+          b.classList.add('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+        });
+        btn.classList.add('active-btn', 'border-indigo-500', 'bg-indigo-500/15', 'text-white');
+        btn.classList.remove('border-slate-800', 'bg-slate-800/40', 'text-slate-300');
+        state.placement = btn.getAttribute('data-placement');
+        state.offsetX = state.offsetY = 0;
+      });
+    });
+
+    // Phone Model Radio Cards
+    document.querySelectorAll('input[name="phoneModel"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        state.phoneModel = e.target.value;
+        document.querySelectorAll('.model-radio-card').forEach(card => {
+          card.classList.remove('border-indigo-500', 'bg-indigo-950/20');
+          card.classList.add('border-slate-800', 'bg-slate-900/60');
+        });
+        e.target.closest('.model-radio-card').classList.add('border-indigo-500', 'bg-indigo-950/20');
+        e.target.closest('.model-radio-card').classList.remove('border-slate-800', 'bg-slate-900/60');
+      });
+    });
+
+    // Color buttons
+    document.querySelectorAll('.color-picker-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.color-picker-btn').forEach(b => b.classList.remove('ring-2', 'ring-indigo-500'));
+        btn.classList.add('ring-2', 'ring-indigo-500');
+        state.frameColor = btn.getAttribute('data-color');
+      });
+    });
+
+    customFrameColor.addEventListener('input', (e) => {
+      state.frameColor = e.target.value;
+    });
+
+    // Background Presets
+    document.querySelectorAll('.bg-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.bg-preset-btn').forEach(b => {
+          b.classList.remove('ring-2', 'ring-indigo-500');
+          b.classList.add('border-slate-700');
+        });
+        btn.classList.add('ring-2', 'ring-indigo-500');
+        state.bgPreset = btn.getAttribute('data-bg');
+      });
+    });
+
+    // Sliders
+    shadowIntensityInput.addEventListener('input', (e) => {
+      state.shadowIntensity = parseFloat(e.target.value);
+    });
+
+    phoneScaleInput.addEventListener('input', (e) => {
+      state.phoneScale = parseFloat(e.target.value) / 100;
+    });
+
+    ambientGlowToggle.addEventListener('change', (e) => {
+      state.ambientGlow = e.target.checked;
+    });
+
+    // Text Overlay
+    showTextToggle.addEventListener('change', (e) => {
+      state.showText = e.target.checked;
+      document.getElementById('textInputsWrapper').style.opacity = e.target.checked ? '1' : '0.4';
+    });
+
+    headlineInput.addEventListener('input', (e) => state.headline = e.target.value);
+    subHeadlineInput.addEventListener('input', (e) => state.subHeadline = e.target.value);
+    badgeInput.addEventListener('input', (e) => state.badge = e.target.value);
+
+    // Video Fit
+    fitCover.addEventListener('click', () => {
+      state.fitMode = 'cover';
+      fitCover.className = "px-2.5 py-1 text-xs rounded font-medium bg-indigo-600 text-white";
+      fitContain.className = "px-2.5 py-1 text-xs rounded font-medium text-slate-400 hover:text-white";
+    });
+
+    fitContain.addEventListener('click', () => {
+      state.fitMode = 'contain';
+      fitContain.className = "px-2.5 py-1 text-xs rounded font-medium bg-indigo-600 text-white";
+      fitCover.className = "px-2.5 py-1 text-xs rounded font-medium text-slate-400 hover:text-white";
+    });
+
+    // --- CANVAS RENDERING PIPELINE ---
+
+    // 1. Draw Background (Supports uploaded Image, Video, or Presets)
+    function renderBackground(w, h) {
+      if (state.aspectRatio === 'phone') {
+        // Transparent / clean dark background for Phone-only export
+        ctx.fillStyle = '#0b0f19';
+        ctx.fillRect(0, 0, w, h);
+        return;
+      }
+
+      ctx.save();
+
+      // Custom Media Background Check (Image or Video)
+      if (state.customBgType === 'image' && state.customBgImage) {
+        if (state.bgBlur > 0) {
+          ctx.filter = `blur(${state.bgBlur}px)`;
+        }
+        // Draw image cover
+        const img = state.customBgImage;
+        const scale = Math.max(w / img.width, h / img.height);
+        const dw = img.width * scale;
+        const dh = img.height * scale;
+        const dx = (w - dw) / 2;
+        const dy = (h - dh) / 2;
+        // Expand slightly if blurred to avoid transparent edges
+        const bleed = state.bgBlur * 2;
+        ctx.drawImage(img, dx - bleed, dy - bleed, dw + bleed * 2, dh + bleed * 2);
+        ctx.filter = 'none';
+
+        // Dim Overlay
+        if (state.bgDim > 0) {
+          ctx.fillStyle = `rgba(0, 0, 0, ${state.bgDim})`;
+          ctx.fillRect(0, 0, w, h);
+        }
+        ctx.restore();
+        return;
+      } else if (state.customBgType === 'video' && bgVideo.readyState >= 2) {
+        if (state.bgBlur > 0) {
+          ctx.filter = `blur(${state.bgBlur}px)`;
+        }
+        const vw = bgVideo.videoWidth || w;
+        const vh = bgVideo.videoHeight || h;
+        const scale = Math.max(w / vw, h / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        const dx = (w - dw) / 2;
+        const dy = (h - dh) / 2;
+        const bleed = state.bgBlur * 2;
+        ctx.drawImage(bgVideo, dx - bleed, dy - bleed, dw + bleed * 2, dh + bleed * 2);
+        ctx.filter = 'none';
+
+        if (state.bgDim > 0) {
+          ctx.fillStyle = `rgba(0, 0, 0, ${state.bgDim})`;
+          ctx.fillRect(0, 0, w, h);
+        }
+        ctx.restore();
+        return;
+      }
+
+      // Default Presets
+      switch (state.bgPreset) {
+        case 'gradient-violet': {
+          const grad = ctx.createLinearGradient(0, 0, w, h);
+          grad.addColorStop(0, '#0f172a');
+          grad.addColorStop(0.4, '#1e1b4b');
+          grad.addColorStop(1, '#3b0764');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+          break;
+        }
+        case 'gradient-sunset': {
+          const grad = ctx.createRadialGradient(w * 0.8, h * 0.2, 50, w * 0.5, h * 0.5, w);
+          grad.addColorStop(0, '#881337');
+          grad.addColorStop(0.5, '#451a03');
+          grad.addColorStop(1, '#09090b');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+          break;
+        }
+        case 'gradient-emerald': {
+          const grad = ctx.createLinearGradient(0, 0, w, h);
+          grad.addColorStop(0, '#064e3b');
+          grad.addColorStop(0.6, '#0f172a');
+          grad.addColorStop(1, '#022c22');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+          break;
+        }
+        case 'gradient-modern': {
+          const grad = ctx.createLinearGradient(0, 0, 0, h);
+          grad.addColorStop(0, '#18181b');
+          grad.addColorStop(1, '#09090b');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+
+          // Subtle grid pattern
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+          ctx.lineWidth = 1;
+          const gridSize = 60;
+          for (let x = 0; x < w; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+            ctx.stroke();
+          }
+          for (let y = 0; y < h; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+            ctx.stroke();
+          }
+          break;
+        }
+        case 'gradient-mesh': {
+          const grad = ctx.createLinearGradient(0, 0, w, h);
+          grad.addColorStop(0, '#4f46e5');
+          grad.addColorStop(0.5, '#ec4899');
+          grad.addColorStop(1, '#f59e0b');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+          break;
+        }
+      }
+      ctx.restore();
+    }
+
+    // 2. Draw Text Overlay on Split Screen Presets (Fixed overlapping math)
+    function renderTextContent(phoneX, phoneY, phoneW, phoneH, w, h) {
+      if (!state.showText || state.aspectRatio === 'phone') return;
+
+      let textX, align;
+      if (state.aspectRatio === '16:9' && state.placement === 'left') {
+        // Phone is on the left; text is on the right
+        textX = phoneX + phoneW + 90;
+        align = 'left';
+      } else if (state.aspectRatio === '16:9' && state.placement === 'right') {
+        // Phone is on the right; text is on the left
+        textX = 140;
+        align = 'left';
+      } else if (state.aspectRatio === '9:16') {
+        // Vertical Story layout: top badge and headline
+        textX = w / 2;
+        align = 'center';
+      } else {
+        return; // Center or isometric without text overlay
+      }
+
+      ctx.save();
+      ctx.textAlign = align;
+      ctx.textBaseline = 'top';
+
+      if (state.aspectRatio === '9:16') {
+        // Top text stack for Vertical story (9:16)
+        let cursorY = 120;
+
+        // Badge pill
+        if (state.badge && state.badge.trim() !== '') {
+          ctx.font = 'bold 16px "Plus Jakarta Sans"';
+          const badgeText = state.badge.toUpperCase();
+          const badgeTextW = ctx.measureText(badgeText).width;
+          const badgeW = badgeTextW + 36;
+          const badgeH = 36;
+          const pillX = textX - badgeW / 2;
+
+          ctx.fillStyle = 'rgba(99, 102, 241, 0.28)';
+          ctx.beginPath();
+          ctx.roundRect(pillX, cursorY, badgeW, badgeH, 18);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(165, 180, 252, 0.5)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#c7d2fe';
+          ctx.fillText(badgeText, textX, cursorY + 9);
+          cursorY += badgeH + 24; // clean gap between badge and title
+        }
+
+        // Headline
+        if (state.headline) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '700 48px "Space Grotesk"';
+          ctx.fillText(state.headline, textX, cursorY);
+          cursorY += 60;
+        }
+
+        // Subtitle
+        if (state.subHeadline) {
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '500 22px "Plus Jakarta Sans"';
+          ctx.fillText(state.subHeadline, textX, cursorY);
+        }
+
+      } else {
+        // 16:9 Landscape Split text stack
+        let cursorY = h / 2 - 160;
+
+        // 1. Badge Pill with accurate bounding box
+        if (state.badge && state.badge.trim() !== '') {
+          ctx.font = 'bold 15px "Plus Jakarta Sans"';
+          const badgeText = state.badge.toUpperCase();
+          const badgeMetrics = ctx.measureText(badgeText);
+          const badgeW = badgeMetrics.width + 32;
+          const badgeH = 34;
+
+          ctx.fillStyle = 'rgba(99, 102, 241, 0.25)';
+          ctx.beginPath();
+          ctx.roundRect(textX, cursorY, badgeW, badgeH, 17);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(129, 140, 248, 0.6)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#a5b4fc';
+          ctx.fillText(badgeText, textX + 16, cursorY + 9);
+
+          // Advance cursor cleanly down to prevent ANY overlapping
+          cursorY += badgeH + 28;
+        }
+
+        // 2. Headline (with auto-wrap calculation)
+        if (state.headline) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '700 54px "Space Grotesk"';
+          const maxTextWidth = 620;
+          const words = state.headline.split(' ');
+          let line = '';
+          const lineHeight = 66;
+
+          for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxTextWidth && n > 0) {
+              ctx.fillText(line.trim(), textX, cursorY);
+              line = words[n] + ' ';
+              cursorY += lineHeight;
+            } else {
+              line = testLine;
+            }
+          }
+          ctx.fillText(line.trim(), textX, cursorY);
+          cursorY += lineHeight + 14;
+        }
+
+        // 3. SubHeadline
+        if (state.subHeadline) {
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '500 22px "Plus Jakarta Sans"';
+          ctx.fillText(state.subHeadline, textX, cursorY);
+          cursorY += 56;
+        }
+
+        // 4. CTA Pill button
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.roundRect(textX, cursorY, 200, 50, 14);
+        ctx.fill();
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px "Plus Jakarta Sans"';
+        ctx.textAlign = 'center';
+        ctx.fillText("Download App", textX + 100, cursorY + 16);
+      }
+
+      ctx.restore();
+    }
+
+    // 3. Draw The Detailed Realistic Phone Frame
+    function renderPhoneMockup(w, h) {
+      // Calculate Phone Dimensions based on scale & aspect
+      const baseHeight = h * 0.82 * state.phoneScale;
+      let phoneHeight = (state.aspectRatio === 'phone') ? (h * 0.94) : baseHeight;
+      let phoneWidth = phoneHeight * 0.495; // realistic 19.5:9 mobile ratio
+
+      let phoneX = (w - phoneWidth) / 2;
+      let phoneY = (h - phoneHeight) / 2;
+
+      // Handle split placement
+      if (state.aspectRatio === '16:9') {
+        if (state.placement === 'left') {
+          phoneX = w * 0.20 - (phoneWidth / 2);
+        } else if (state.placement === 'right') {
+          phoneX = w * 0.78 - (phoneWidth / 2);
+        }
+      } else if (state.aspectRatio === '9:16') {
+        const topPad = 330, availH = h - topPad - 60; // keep phone clear of the headline
+        if (phoneHeight > availH) { phoneHeight = availH; phoneWidth = phoneHeight * 0.495; phoneX = (w - phoneWidth) / 2; }
+        phoneY = topPad + (availH - phoneHeight) / 2;
+      }
+
+      phoneX += state.offsetX;
+      phoneY += state.offsetY;
+
+      ctx.save();
+
+      // Apply 3D Isometric Tilt transformation if selected
+      if (state.placement === 'isometric') {
+        ctx.translate(phoneX + phoneWidth / 2, phoneY + phoneHeight / 2);
+        ctx.transform(1, -0.06, 0.08, 0.98, 0, 0); // perspective skew
+        ctx.rotate(-4 * Math.PI / 180);
+        ctx.translate(-(phoneX + phoneWidth / 2), -(phoneY + phoneHeight / 2));
+      }
+
+      const cornerRadius = phoneWidth * 0.125;
+      const bezelThickness = state.phoneModel === 'minimal' ? 8 : 14;
+
+      // Outer Bezel Shadow
+      if (state.shadowIntensity > 0) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        ctx.shadowBlur = state.shadowIntensity * 1.5;
+        ctx.shadowOffsetY = state.shadowIntensity * 0.7;
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.roundRect(phoneX, phoneY, phoneWidth, phoneHeight, cornerRadius);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Ambient screen glow on the background behind the phone
+      if (state.ambientGlow) {
+        ctx.save();
+        const glowGrad = ctx.createRadialGradient(
+          phoneX + phoneWidth / 2, phoneY + phoneHeight / 2, phoneWidth * 0.3,
+          phoneX + phoneWidth / 2, phoneY + phoneHeight / 2, phoneWidth * 1.1
+        );
+        glowGrad.addColorStop(0, 'rgba(99, 102, 241, 0.28)');
+        glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = glowGrad;
+        ctx.fillRect(phoneX - 100, phoneY - 100, phoneWidth + 200, phoneHeight + 200);
+        ctx.restore();
+      }
+
+      // Outer Metal / Titanium Frame
+      ctx.fillStyle = state.frameColor;
+      ctx.beginPath();
+      ctx.roundRect(phoneX, phoneY, phoneWidth, phoneHeight, cornerRadius);
+      ctx.fill();
+
+      // Inner Frame Highlights / Chamfered edge
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(phoneX + 1, phoneY + 1, phoneWidth - 2, phoneHeight - 2, cornerRadius);
+      ctx.stroke();
+
+      // Screen active area
+      const screenX = phoneX + bezelThickness;
+      const screenY = phoneY + bezelThickness;
+      const screenW = phoneWidth - (bezelThickness * 2);
+      const screenH = phoneHeight - (bezelThickness * 2);
+      const screenRadius = Math.max(0, cornerRadius - bezelThickness);
+
+      // Save context for screen clipping
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(screenX, screenY, screenW, screenH, screenRadius);
+      ctx.clip();
+
+      // Screen background (default black)
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(screenX, screenY, screenW, screenH);
+
+      // Draw the user screen recording or demo video onto the mobile screen
+      if (state.hasVideo && video.readyState >= 2) {
+        const vw = video.videoWidth || 1080;
+        const vh = video.videoHeight || 1920;
+
+        if (state.fitMode === 'cover') {
+          const scale = Math.max(screenW / vw, screenH / vh);
+          const dw = vw * scale;
+          const dh = vh * scale;
+          const dx = screenX + (screenW - dw) / 2;
+          const dy = screenY + (screenH - dh) / 2;
+          ctx.drawImage(video, dx, dy, dw, dh);
+        } else {
+          // Contain mode
+          const scale = Math.min(screenW / vw, screenH / vh);
+          const dw = vw * scale;
+          const dh = vh * scale;
+          const dx = screenX + (screenW - dw) / 2;
+          const dy = screenY + (screenH - dh) / 2;
+          ctx.drawImage(video, dx, dy, dw, dh);
+        }
+      } else {
+        // Standby screen artwork if no video loaded
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fillRect(screenX, screenY, screenW, screenH);
+        ctx.fillStyle = '#818cf8';
+        ctx.font = '600 20px "Plus Jakarta Sans"';
+        ctx.textAlign = 'center';
+        ctx.fillText("Upload or Load Video", screenX + screenW / 2, screenY + screenH / 2);
+      }
+
+      ctx.restore();
+
+      // Draw Hardware Overlays / Cutouts depending on Model
+      if (state.phoneModel === 'iphone15') {
+        // iPhone Dynamic Island
+        const islandW = phoneWidth * 0.28;
+        const islandH = 22;
+        const islandX = phoneX + (phoneWidth - islandW) / 2;
+        const islandY = screenY + 11;
+
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.roundRect(islandX, islandY, islandW, islandH, 11);
+        ctx.fill();
+
+        // Subtle camera lens glare
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(islandX + islandW - 14, islandY + 11, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (state.phoneModel === 'android') {
+        // Punch-hole Camera
+        const camX = phoneX + phoneWidth / 2;
+        const camY = screenY + 15;
+
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(camX, camY, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0e1726';
+        ctx.beginPath();
+        ctx.arc(camX, camY, 3, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (state.phoneModel === 'notch') {
+        // Classic iPhone Notch
+        const notchW = phoneWidth * 0.42;
+        const notchH = 24;
+        const notchX = phoneX + (phoneWidth - notchW) / 2;
+        const notchY = screenY;
+
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.roundRect(notchX, notchY, notchW, notchH, [0, 0, 14, 14]);
+        ctx.fill();
+
+        // Speaker grille
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.roundRect(notchX + (notchW - 44) / 2, notchY + 5, 44, 4, 2);
+        ctx.fill();
+      }
+
+      // Glass specular reflection across the screen
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(screenX, screenY, screenW, screenH, screenRadius);
+      ctx.clip();
+      const specGrad = ctx.createLinearGradient(screenX, screenY, screenX + screenW, screenY + screenH);
+      specGrad.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
+      specGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.02)');
+      specGrad.addColorStop(0.32, 'rgba(255, 255, 255, 0)');
+      specGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = specGrad;
+      ctx.fillRect(screenX, screenY, screenW, screenH);
+      ctx.restore();
+
+      ctx.restore();
+
+      // Return dimensions for text placement alignment
+      return { phoneX, phoneY, phoneWidth, phoneHeight };
+    }
+
+    // --- Drag the phone anywhere on the canvas (double-click to reset) ---
+    let lastBounds = null, drag = null;
+    function canvasPoint(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
+    }
+    function overPhone(pt) {
+      const b = lastBounds;
+      return !!b && pt.x >= b.phoneX && pt.x <= b.phoneX + b.phoneWidth && pt.y >= b.phoneY && pt.y <= b.phoneY + b.phoneHeight;
+    }
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', (e) => {
+      const pt = canvasPoint(e);
+      if (!overPhone(pt)) return;
+      drag = { x: pt.x, y: pt.y, ox: state.offsetX, oy: state.offsetY };
+      canvas.setPointerCapture(e.pointerId);
+      canvas.style.cursor = 'grabbing';
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const pt = canvasPoint(e);
+      if (!drag) { canvas.style.cursor = overPhone(pt) ? 'grab' : 'default'; return; }
+      const b = lastBounds;
+      // keep the phone's center inside the canvas
+      const baseCx = b.phoneX + b.phoneWidth / 2 - state.offsetX, baseCy = b.phoneY + b.phoneHeight / 2 - state.offsetY;
+      const nx = drag.ox + pt.x - drag.x, ny = drag.oy + pt.y - drag.y;
+      state.offsetX = Math.min(canvas.width - baseCx, Math.max(-baseCx, nx));
+      state.offsetY = Math.min(canvas.height - baseCy, Math.max(-baseCy, ny));
+    });
+    const endDrag = () => { drag = null; canvas.style.cursor = 'grab'; };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('dblclick', (e) => {
+      if (overPhone(canvasPoint(e))) { state.offsetX = state.offsetY = 0; showToast('Phone position reset'); }
+    });
+
+    // Main Canvas Render Loop
+    function renderMainLoop() {
+      if (video.duration && isFinite(video.duration) && !video.seeking && document.activeElement !== progressBar) {
+        progressBar.value = (video.currentTime / video.duration) * 100;
+        currentTimeDisplay.textContent = formatTime(video.currentTime);
+      }
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Render Background
+      renderBackground(canvas.width, canvas.height);
+
+      // 2. Render Phone Mockup
+      const bounds = renderPhoneMockup(canvas.width, canvas.height);
+      lastBounds = bounds;
+
+      // 3. Render Text Overlays
+      if (bounds) {
+        renderTextContent(bounds.phoneX, bounds.phoneY, bounds.phoneWidth, bounds.phoneHeight, canvas.width, canvas.height);
+      }
+
+      requestAnimationFrame(renderMainLoop);
+    }
+
+    function updateCanvasDimensions() {
+      if (state.aspectRatio === '16:9') {
+        targetWidth = 1920;
+        targetHeight = 1080;
+        canvasDimLabel.textContent = "1920 × 1080 (16:9)";
+      } else if (state.aspectRatio === '9:16') {
+        targetWidth = 1080;
+        targetHeight = 1920;
+        canvasDimLabel.textContent = "1080 × 1920 (9:16 Story)";
+      } else if (state.aspectRatio === '1:1') {
+        targetWidth = 1080;
+        targetHeight = 1080;
+        canvasDimLabel.textContent = "1080 × 1080 (1:1 Square)";
+      } else if (state.aspectRatio === 'phone') {
+        targetWidth = 620;
+        targetHeight = 1240;
+        canvasDimLabel.textContent = "620 × 1240 (Fitted Phone)";
+      }
+      state.offsetX = state.offsetY = 0;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      fitCanvas();
+    }
+
+    // Fit canvas inside the stage with pixel sizes: no scrolling, ever
+    function fitCanvas() {
+      const st = document.getElementById('stageContainer');
+      const pad = window.innerWidth >= 1024 ? 32 : 16;
+      const aw = st.clientWidth - pad * 2, ah = st.clientHeight - pad * 2;
+      if (aw <= 0 || ah <= 0) return;
+      const k = Math.min(aw / canvas.width, ah / canvas.height);
+      const w = Math.floor(canvas.width * k), h = Math.floor(canvas.height * k);
+      Object.assign(canvas.style, { width: w + 'px', height: h + 'px',
+        left: Math.round((st.clientWidth - w) / 2) + 'px', top: Math.round((st.clientHeight - h) / 2) + 'px' });
+    }
+    new ResizeObserver(fitCanvas).observe(document.getElementById('stageContainer'));
+
+    // Video File Loader
+    function handleVideoFile(file) {
+      if (!file || !file.type.startsWith('video/')) {
+        showToast("Please provide a valid video file.", true);
+        return;
+      }
+
+      const fileURL = URL.createObjectURL(file);
+      video.srcObject = null;
+      video.src = fileURL;
+      video.loop = state.isLooping;
+      video.load();
+
+      video.onloadedmetadata = () => {
+        state.hasVideo = true;
+        videoFilename.textContent = file.name;
+        videoDuration.textContent = formatTime(video.duration);
+        totalTimeDisplay.textContent = formatTime(video.duration);
+        videoMeta.classList.remove('hidden');
+        videoMeta.classList.add('flex');
+
+        video.play().then(() => updatePlayIcons(true)).catch(() => updatePlayIcons(false));
+        showToast("Screen recording loaded!");
+      };
+
+      video.onerror = () => {
+        if (!video.getAttribute('src')) return;
+        showToast("Error loading video file.", true);
+      };
+    }
+
+    videoInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleVideoFile(e.target.files[0]);
+      }
+    });
+
+    // Generate Animated Demo Video Canvas Stream if no user file is present
+    function createDemoVideo() {
+      const demoCanvas = document.createElement('canvas');
+      demoCanvas.width = 720;
+      demoCanvas.height = 1480;
+      const dCtx = demoCanvas.getContext('2d');
+
+      let tick = 0;
+      function drawDemoFrame() {
+        tick += 0.035;
+        // Background
+        const dGrad = dCtx.createLinearGradient(0, 0, 0, 1480);
+        dGrad.addColorStop(0, '#090d16');
+        dGrad.addColorStop(1, '#111827');
+        dCtx.fillStyle = dGrad;
+        dCtx.fillRect(0, 0, 720, 1480);
+
+        // Header bar
+        dCtx.fillStyle = '#1f2937';
+        dCtx.beginPath();
+        dCtx.roundRect(40, 70, 640, 70, 20);
+        dCtx.fill();
+
+        dCtx.fillStyle = '#6366f1';
+        dCtx.beginPath();
+        dCtx.arc(80, 105, 18, 0, Math.PI * 2);
+        dCtx.fill();
+
+        dCtx.fillStyle = '#ffffff';
+        dCtx.font = 'bold 22px "Plus Jakarta Sans"';
+        dCtx.textAlign = 'left';
+        dCtx.fillText("Habit Studio Dashboard", 116, 112);
+
+        // Circular progress metric
+        const centerX = 360;
+        const centerY = 310;
+        const radius = 100;
+        dCtx.beginPath();
+        dCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        dCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        dCtx.lineWidth = 18;
+        dCtx.stroke();
+
+        const progressAngle = ((Math.sin(tick) + 1) / 2) * Math.PI * 1.6;
+        dCtx.beginPath();
+        dCtx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + progressAngle);
+        dCtx.strokeStyle = '#6366f1';
+        dCtx.lineWidth = 18;
+        dCtx.lineCap = 'round';
+        dCtx.stroke();
+
+        dCtx.fillStyle = '#ffffff';
+        dCtx.font = '700 42px "Space Grotesk"';
+        dCtx.textAlign = 'center';
+        dCtx.fillText(`${Math.round(((Math.sin(tick) + 1) / 2) * 100)}%`, centerX, centerY + 14);
+
+        // Activity Cards
+        const cardYBase = 470;
+        for (let i = 0; i < 4; i++) {
+          const cy = cardYBase + i * 140;
+          dCtx.fillStyle = '#1e293b';
+          dCtx.beginPath();
+          dCtx.roundRect(40, cy, 640, 115, 24);
+          dCtx.fill();
+
+          dCtx.fillStyle = i === 0 ? '#38bdf8' : i === 1 ? '#a855f7' : i === 2 ? '#10b981' : '#f59e0b';
+          dCtx.beginPath();
+          dCtx.roundRect(65, cy + 28, 60, 60, 18);
+          dCtx.fill();
+
+          dCtx.fillStyle = '#ffffff';
+          dCtx.font = 'bold 24px "Plus Jakarta Sans"';
+          dCtx.textAlign = 'left';
+          const titles = ["Morning Meditation", "Read 30 Pages", "5km Outdoor Run", "Deep Work Sprint"];
+          dCtx.fillText(titles[i], 145, cy + 54);
+
+          dCtx.fillStyle = '#94a3b8';
+          dCtx.font = '18px "Plus Jakarta Sans"';
+          dCtx.fillText("Daily streak: 14 days active", 145, cy + 86);
+        }
+
+        // Animated bottom floating sheet
+        const bounce = Math.sin(tick * 2) * 10;
+        dCtx.fillStyle = '#4338ca';
+        dCtx.beginPath();
+        dCtx.roundRect(40, 1080 + bounce, 640, 110, 28);
+        dCtx.fill();
+        dCtx.fillStyle = '#ffffff';
+        dCtx.font = 'bold 24px "Plus Jakarta Sans"';
+        dCtx.textAlign = 'center';
+        dCtx.fillText("Completed 6 Tasks Today!", 360, 1146 + bounce);
+
+        requestAnimationFrame(drawDemoFrame);
+      }
+      drawDemoFrame();
+
+      const stream = demoCanvas.captureStream(30);
+      video.srcObject = stream;
+      video.play().then(() => {
+        state.hasVideo = true;
+        videoFilename.textContent = "Built-in Screen Recording Demo";
+        videoDuration.textContent = "Live";
+        totalTimeDisplay.textContent = "Live";
+        videoMeta.classList.remove('hidden');
+        videoMeta.classList.add('flex');
+        updatePlayIcons(true);
+        showToast("Demo recording loaded!");
+      }).catch(err => console.error(err));
+    }
+
+    // --- Reliable Canvas Recording Pipeline (Fixes Sticking & Unplayable Output) ---
+    exportModalBtn.addEventListener('click', () => {
+      exportModal.classList.remove('hidden');
+      exportModal.classList.add('flex');
+      exportInitialState.classList.remove('hidden');
+      exportProgressState.classList.add('hidden');
+      exportSuccessState.classList.add('hidden');
+    });
+
+    cancelExportBtn.addEventListener('click', () => {
+      exportModal.classList.add('hidden');
+      exportModal.classList.remove('flex');
+      stopExportRecording(true);
+    });
+
+    closeExportModalBtn.addEventListener('click', () => {
+      exportModal.classList.add('hidden');
+      exportModal.classList.remove('flex');
+    });
+
+    forceStopRenderBtn.addEventListener('click', () => {
+      stopExportRecording(false);
+    });
+
+    function getSupportedMimeType() {
+      const selectedRadio = document.querySelector('input[name="exportFormatRadio"]:checked')?.value;
+      const candidates = (selectedRadio === 'webm') ? [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+      ] : [
+        'video/mp4;codecs=avc1.640028',
+        'video/mp4;codecs=avc1.64002A',
+        'video/mp4;codecs=avc1',
+        'video/mp4',
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=h264',
+        'video/webm'
+      ];
+
+      for (const mime of candidates) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime)) {
+          return mime;
+        }
+      }
+      return 'video/webm';
+    }
+
+    function stopExportRecording(cancelled = false) {
+      if (exportTimer) {
+        clearInterval(exportTimer);
+        exportTimer = null;
+      }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try {
+          mediaRecorder.stop();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      if (cancelled) {
+        recordedChunks = [];
+      }
+    }
+
+    startRenderBtn.addEventListener('click', async () => {
+      if (!state.hasVideo) {
+        showToast("Please upload or load a video first before exporting.", true);
+        return;
+      }
+
+      exportInitialState.classList.add('hidden');
+      exportProgressState.classList.remove('hidden');
+
+      // 60 FPS stream from live mockup canvas
+      const canvasStream = canvas.captureStream(30);
+
+      // Attempt to include audio track if source video has audio
+      try {
+        let audioStream = null;
+        if (video.captureStream) {
+          audioStream = video.captureStream();
+        } else if (video.mozCaptureStream) {
+          audioStream = video.mozCaptureStream();
+        }
+        if (audioStream && audioStream.getAudioTracks().length > 0 && !state.isMuted) {
+          const audioTrack = audioStream.getAudioTracks()[0];
+          canvasStream.addTrack(audioTrack);
+        }
+      } catch (err) {
+        console.warn("Audio track capture bypassed:", err);
+      }
+
+      const mimeType = getSupportedMimeType();
+      recordedChunks = [];
+
+      try {
+        mediaRecorder = new MediaRecorder(canvasStream, {
+          mimeType: mimeType,
+          videoBitsPerSecond: Math.max(4e6, Math.round(canvas.width * canvas.height * 30 * 0.12)) // 10 Mbps balanced for high quality and smooth player decoding
+        });
+      } catch (e) {
+        console.warn("Fallback to default mime:", e);
+        mediaRecorder = new MediaRecorder(canvasStream);
+      }
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        video.loop = state.isLooping;
+        if (recordedChunks.length === 0) {
+          showToast("Export failed: no frames were recorded.", true);
+          exportInitialState.classList.remove('hidden');
+          exportProgressState.classList.add('hidden');
+          return;
+        }
+
+        const isMp4 = mimeType.includes('mp4');
+        const ext = isMp4 ? 'mp4' : 'webm';
+        const finalBlob = new Blob(recordedChunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
+        const videoUrl = URL.createObjectURL(finalBlob);
+
+        if (window._lastExportUrl) URL.revokeObjectURL(window._lastExportUrl);
+        window._lastExportUrl = videoUrl;
+        document.getElementById('exportPreview').src = videoUrl;
+        downloadVideoAnchor.href = videoUrl;
+        downloadVideoAnchor.target = '_blank';
+        downloadVideoAnchor.rel = 'noopener';
+        downloadVideoAnchor.download = `mockup-showcase-${Date.now()}.${ext}`;
+        downloadVideoAnchor.innerHTML = `<i class="ph-bold ph-download-simple inline-block mr-1"></i> Download ${ext.toUpperCase()} Video`;
+
+        exportProgressState.classList.add('hidden');
+        exportSuccessState.classList.remove('hidden');
+        showToast("Video rendered and ready for download!");
+      };
+
+      // Rewind video to start and record the video duration
+      video.pause();
+      video.loop = false;
+      if (video.duration && isFinite(video.duration)) video.currentTime = 0;
+      if (state.customBgType === 'video') {
+        bgVideo.currentTime = 0;
+        bgVideo.play().catch(() => {});
+      }
+
+      const totalSec = (video.duration && isFinite(video.duration)) ? video.duration : 10;
+      const totalMs = totalSec * 1000;
+
+      // Start recorder with small chunk slices so buffers flush continuously without freezing
+      // Wait for the seek to land so the first frames are correct
+      await new Promise(r => { const t = setTimeout(r, 800); video.addEventListener('seeked', () => { clearTimeout(t); r(); }, { once: true }); });
+      await new Promise(r => setTimeout(r, 120));
+      mediaRecorder.start(250);
+      video.play().catch(() => {});
+
+      const startTimestamp = Date.now();
+      exportTimer = setInterval(() => {
+        const elapsed = Date.now() - startTimestamp;
+        const progress = Math.min(100, Math.floor((elapsed / totalMs) * 100));
+
+        exportProgressBar.style.width = `${progress}%`;
+        exportPercent.textContent = `${progress}%`;
+        exportFrameCount.textContent = `${formatTime(elapsed / 1000)} / ${formatTime(totalSec)}`;
+
+        if (elapsed >= totalMs || video.ended) {
+          stopExportRecording(false);
+        }
+      }, 100);
+
+      // Handle video natural finish
+      video.onended = () => {
+        stopExportRecording(false);
+      };
+    });
+
+    // --- App Init ---
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !/INPUT|TEXTAREA|BUTTON/.test(e.target.tagName) && exportModal.classList.contains('hidden')) {
+        e.preventDefault(); togglePlay();
+      }
+    });
+
+    window.onload = function() {
+      Promise.all(['700 48px "Space Grotesk"','bold 16px "Plus Jakarta Sans"','500 22px "Plus Jakarta Sans"'].map(f => document.fonts.load(f))).catch(() => {});
+      updateCanvasDimensions();
+      // Start real-time render loop
+      renderMainLoop();
+
+      // Automatically load demo on initial startup so user immediately sees a working mockup
+      createDemoVideo();
+    };
+
+    // Responsive Canvas Resizing on Window Resize
+    window.addEventListener('resize', () => {
+      // The canvas maintains its targetWidth and targetHeight internally for sharp 1080p/4K render,
+      // while CSS max-w-full and max-h-full adaptively scales it to fit any viewport.
+    });
+  </script>
+</body>
+</html>
