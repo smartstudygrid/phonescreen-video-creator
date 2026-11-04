@@ -224,6 +224,35 @@
                 <p class="text-[10px] text-slate-400">Edge-to-edge sleek outline</p>
               </div>
             </label>
+          
+            <label class="cursor-pointer border border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="pixel" class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">Pixel Series</p>
+                <p class="text-[10px] text-slate-400">Centered punch-hole, soft corners</p>
+              </div>
+            </label>
+            <label class="cursor-pointer border border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="galaxy" class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">Galaxy Ultra</p>
+                <p class="text-[10px] text-slate-400">Flat edges, ultra-thin bezel</p>
+              </div>
+            </label>
+            <label class="cursor-pointer border border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="se" class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">iPhone SE</p>
+                <p class="text-[10px] text-slate-400">Home button, classic bezels</p>
+              </div>
+            </label>
+            <label class="cursor-pointer border border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 transition model-radio-card">
+              <input type="radio" name="phoneModel" value="clay" class="accent-indigo-500">
+              <div class="flex-1">
+                <p class="text-xs font-bold text-slate-200">Clay Matte</p>
+                <p class="text-[10px] text-slate-400">Soft studio look, no hardware</p>
+              </div>
+            </label>
           </div>
 
           <!-- Device Finish / Color -->
@@ -1155,11 +1184,24 @@
     }
 
     // 3. Draw The Detailed Realistic Phone Frame
+    const MODELS = {
+      iphone15: { aspect: 0.495, bt: 14, bb: 14, bs: 14, r: 0.125 },
+      android:  { aspect: 0.495, bt: 14, bb: 14, bs: 14, r: 0.125 },
+      notch:    { aspect: 0.495, bt: 14, bb: 14, bs: 14, r: 0.125 },
+      minimal:  { aspect: 0.495, bt: 8,  bb: 8,  bs: 8,  r: 0.125 },
+      pixel:    { aspect: 0.465, bt: 12, bb: 12, bs: 12, r: 0.105 },
+      galaxy:   { aspect: 0.460, bt: 8,  bb: 8,  bs: 8,  r: 0.070 },
+      se:       { aspect: 0.560, bt: 66, bb: 74, bs: 16, r: 0.090, sr: 4 },
+      clay:     { aspect: 0.490, bt: 16, bb: 16, bs: 16, r: 0.160 }
+    };
+    function modelSpec() { return MODELS[state.phoneModel] || MODELS.iphone15; }
+
     function renderPhoneMockup(w, h, mode = 'live') {
       // Calculate Phone Dimensions based on scale & aspect
       const baseHeight = h * 0.82 * state.phoneScale;
       let phoneHeight = (state.aspectRatio === 'phone') ? (h * 0.94) : baseHeight;
-      let phoneWidth = phoneHeight * 0.495; // realistic 19.5:9 mobile ratio
+      let phoneWidth = phoneHeight * modelSpec().aspect;
+      if (phoneWidth > w * 0.94) { phoneWidth = w * 0.94; phoneHeight = phoneWidth / modelSpec().aspect; } // realistic 19.5:9 mobile ratio
 
       let phoneX = (w - phoneWidth) / 2;
       let phoneY = (h - phoneHeight) / 2;
@@ -1173,11 +1215,11 @@
         }
       } else if (state.aspectRatio === '9:16') {
         const topPad = 330, availH = h - topPad - 60; // keep phone clear of the headline
-        if (phoneHeight > availH) { phoneHeight = availH; phoneWidth = phoneHeight * 0.495; phoneX = (w - phoneWidth) / 2; }
+        if (phoneHeight > availH) { phoneHeight = availH; phoneWidth = phoneHeight * modelSpec().aspect; phoneX = (w - phoneWidth) / 2; }
         phoneY = topPad + (availH - phoneHeight) / 2;
       } else if (state.showText && (state.aspectRatio === '1:1' || (state.aspectRatio === '16:9' && (state.placement === 'center' || state.placement === 'isometric')))) {
         const topPad = 250, availH = h - topPad - 40;
-        if (phoneHeight > availH) { phoneHeight = availH; phoneWidth = phoneHeight * 0.495; phoneX = (w - phoneWidth) / 2; }
+        if (phoneHeight > availH) { phoneHeight = availH; phoneWidth = phoneHeight * modelSpec().aspect; phoneX = (w - phoneWidth) / 2; }
         phoneY = topPad + (availH - phoneHeight) / 2;
       }
 
@@ -1194,8 +1236,9 @@
         ctx.translate(-(phoneX + phoneWidth / 2), -(phoneY + phoneHeight / 2));
       }
 
-      const cornerRadius = phoneWidth * 0.125;
-      const bezelThickness = state.phoneModel === 'minimal' ? 8 : 14;
+      const M = modelSpec();
+      const cornerRadius = phoneWidth * M.r;
+      const bezelThickness = M.bs;
 
       // Outer Bezel Shadow
       if (mode !== 'live' && state.shadowIntensity > 0) {
@@ -1226,6 +1269,18 @@
 
       if (mode === 'backdrop') { ctx.restore(); return { phoneX, phoneY, phoneWidth, phoneHeight }; }
 
+      // Side buttons peeking out of the frame
+      ctx.fillStyle = state.frameColor;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1;
+      [[phoneX - 4, 0.17, 0.045], [phoneX - 4, 0.24, 0.075], [phoneX - 4, 0.33, 0.075],
+       [phoneX + phoneWidth - 2, 0.27, 0.12]].forEach(([bx, fy, fh]) => {
+        ctx.beginPath();
+        ctx.roundRect(bx, phoneY + phoneHeight * fy, 6, phoneHeight * fh, 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+
       // Outer Metal / Titanium Frame
       ctx.fillStyle = state.frameColor;
       ctx.beginPath();
@@ -1240,11 +1295,11 @@
       ctx.stroke();
 
       // Screen active area
-      const screenX = phoneX + bezelThickness;
-      const screenY = phoneY + bezelThickness;
-      const screenW = phoneWidth - (bezelThickness * 2);
-      const screenH = phoneHeight - (bezelThickness * 2);
-      const screenRadius = Math.max(0, cornerRadius - bezelThickness);
+      const screenX = phoneX + M.bs;
+      const screenY = phoneY + M.bt;
+      const screenW = phoneWidth - M.bs * 2;
+      const screenH = phoneHeight - M.bt - M.bb;
+      const screenRadius = M.sr !== undefined ? M.sr : Math.max(0, cornerRadius - M.bs);
 
       // Save context for screen clipping
       ctx.save();
@@ -1339,6 +1394,32 @@
         ctx.beginPath();
         ctx.roundRect(notchX + (notchW - 44) / 2, notchY + 5, 44, 4, 2);
         ctx.fill();
+      } else if (state.phoneModel === 'pixel' || state.phoneModel === 'galaxy') {
+        // Centered punch-hole with a lens ring
+        const r = state.phoneModel === 'pixel' ? 8 : 5.5;
+        const cx = phoneX + phoneWidth / 2, cy = screenY + (state.phoneModel === 'pixel' ? 20 : 16);
+        ctx.fillStyle = '#000000';
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(cx, cy, r - 1.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#0e1726';
+        ctx.beginPath(); ctx.arc(cx, cy, r * 0.4, 0, Math.PI * 2); ctx.fill();
+      } else if (state.phoneModel === 'se') {
+        // Earpiece, front camera and Home button
+        const cx = phoneX + phoneWidth / 2;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.beginPath(); ctx.roundRect(cx - phoneWidth * 0.1, phoneY + 28, phoneWidth * 0.2, 7, 3.5); ctx.fill();
+        ctx.fillStyle = '#0e1726';
+        ctx.beginPath(); ctx.arc(cx - phoneWidth * 0.17, phoneY + 31.5, 5, 0, Math.PI * 2); ctx.fill();
+        const hy = phoneY + phoneHeight - M.bb / 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+        ctx.lineWidth = 3;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.beginPath(); ctx.arc(cx, hy, 24, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      } else if (state.phoneModel === 'clay') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.beginPath(); ctx.arc(phoneX + phoneWidth / 2, screenY + 16, 5, 0, Math.PI * 2); ctx.fill();
       }
 
       // Glass specular reflection across the screen
@@ -1403,7 +1484,7 @@
       const w = targetWidth, h = targetHeight;
       if (state.customBgType === 'video') { renderBackground(w, h); renderPhoneMockup(w, h, 'backdrop'); return; }
       const key = [w, h, state.aspectRatio, state.placement, state.phoneScale, state.shadowIntensity, state.ambientGlow,
-        state.bgPreset, state.customBgType, state.bgBlur, state.bgDim, state.offsetX, state.offsetY, state.showText, renderScale].join('|');
+        state.bgPreset, state.customBgType, state.bgBlur, state.bgDim, state.offsetX, state.offsetY, state.showText, renderScale, state.phoneModel].join('|');
       if (baseLayer.key !== key || baseLayer.img !== state.customBgImage) {
         baseLayer.c.width = Math.round(w * renderScale); baseLayer.c.height = Math.round(h * renderScale);
         const main = ctx; ctx = baseLayer.c.getContext('2d');
