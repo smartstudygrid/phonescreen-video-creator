@@ -373,6 +373,43 @@
           </div>
         </div>
 
+        <!-- 7. Background Music -->
+        <div class="border-t border-slate-800 pt-4">
+          <label class="text-xs font-bold tracking-wider text-slate-400 uppercase">7. Background Music</label>
+          <div class="mt-3 space-y-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+            <div class="flex items-center gap-2">
+              <label for="musicFileInput" class="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-xs font-semibold text-slate-200">Add music</label>
+              <input type="file" id="musicFileInput" accept="audio/*" class="hidden">
+              <span id="musicFileName" class="flex-1 truncate text-[11px] text-slate-400">No track selected</span>
+              <button type="button" id="clearMusicBtn" class="hidden text-[11px] text-rose-400 hover:text-rose-300">Remove</button>
+            </div>
+            <div id="musicControls" class="space-y-3 opacity-50 pointer-events-none">
+          <div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+              <span>Music volume</span><span id="musicVolumeVal" class="text-slate-300">80%</span>
+            </div>
+            <input type="range" id="musicVolume" min="0" max="100" step="1" value="80" class="w-full accent-indigo-500">
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+              <span>Fade in</span><span id="musicFadeInVal" class="text-slate-300">1s</span>
+            </div>
+            <input type="range" id="musicFadeIn" min="0" max="10" step="0.5" value="1" class="w-full accent-indigo-500">
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+              <span>Fade out</span><span id="musicFadeOutVal" class="text-slate-300">2s</span>
+            </div>
+            <input type="range" id="musicFadeOut" min="0" max="10" step="0.5" value="2" class="w-full accent-indigo-500">
+          </div>
+              <label class="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+                <input type="checkbox" id="musicLoop" checked class="w-3.5 h-3.5 rounded accent-indigo-500">
+                <span>Loop music if shorter than the video</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
       </div>
     </aside>
 
@@ -430,6 +467,7 @@
   </main>
 
   <!-- Hidden HTML5 Video element used as texture source for Canvas -->
+  <audio id="musicEl" preload="auto"></audio>
   <video id="sourceVideo" playsinline muted loop preload="auto" crossorigin="anonymous" style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none"></video>
   <!-- Hidden Background Video element if user uploads video background -->
   <video id="bgVideo" playsinline loop muted preload="auto" crossorigin="anonymous" style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none"></video>
@@ -1537,6 +1575,7 @@
 
     // Main Canvas Render Loop
     function renderMainLoop() {
+      syncMusic();
       if (video.duration && isFinite(video.duration) && !video.seeking && document.activeElement !== progressBar) {
         progressBar.value = (video.currentTime / video.duration) * 100;
         setText(currentTimeDisplay, formatTime(video.currentTime));
@@ -1839,20 +1878,27 @@
       applyScale(1); // export at full resolution
       const canvasStream = canvas.captureStream(30);
 
-      // Attempt to include audio track if source video has audio
+      // Mix music and the video's own audio into one track (scene exports only)
       try {
-        let audioStream = null;
-        if (video.captureStream) {
-          audioStream = video.captureStream();
-        } else if (video.mozCaptureStream) {
-          audioStream = video.mozCaptureStream();
+        let vTracks = [];
+        if (state.exportBg === 'normal' && !state.isMuted) {
+          const as = video.captureStream ? video.captureStream() : (video.mozCaptureStream ? video.mozCaptureStream() : null);
+          if (as) vTracks = as.getAudioTracks();
         }
-        if (audioStream && audioStream.getAudioTracks().length > 0 && !state.isMuted && state.exportBg === 'normal') {
-          const audioTrack = audioStream.getAudioTracks()[0];
-          canvasStream.addTrack(audioTrack);
+        const wantMusic = music.loaded && state.exportBg === 'normal';
+        if (wantMusic || vTracks.length) {
+          const mix = ensureAudio();
+          await mix.ctx.resume();
+          mix.monitor.gain.value = 0; // don't play the music out loud while recording
+          if (vTracks.length) {
+            window._vSrc = mix.ctx.createMediaStreamSource(new MediaStream([vTracks[0]]));
+            window._vSrc.connect(mix.dest);
+          }
+          if (wantMusic) musicEl.currentTime = 0;
+          canvasStream.addTrack(mix.dest.stream.getAudioTracks()[0]);
         }
       } catch (err) {
-        console.warn("Audio track capture bypassed:", err);
+        console.warn("Audio mix bypassed:", err);
       }
 
       const mimeType = getSupportedMimeType();
@@ -1878,6 +1924,9 @@
         video.loop = state.isLooping;
         const bgMode = state.exportBg;
         state.exportBg = 'normal';
+        exportClock = null;
+        if (audioMix) audioMix.monitor.gain.value = 1;
+        if (window._vSrc) { try { window._vSrc.disconnect(); } catch (e) {} window._vSrc = null; }
         applyScale(previewScale());
         if (recordedChunks.length === 0) {
           showToast("Export failed: no frames were recorded.", true);
@@ -1956,6 +2005,8 @@
         exportProgressBar.style.width = `${progress}%`;
         setText(exportPercent, `${progress}%`);
         setText(exportFrameCount, `${formatTime(pos)} / ${formatTime(totalSec)}`);
+        exportClock = { pos, total: totalSec };
+        syncMusic();
 
         if (!isLive && video.paused && !video.ended) video.play().catch(() => {});
 
@@ -1973,6 +2024,86 @@
       video.onended = () => {
         stopExportRecording(false);
       };
+    });
+
+    // --- Background music: playback sync, volume, fades ---
+    const musicEl = document.getElementById('musicEl');
+    const music = { loaded: false, vol: 0.8, fadeIn: 1, fadeOut: 2, loop: true, url: null };
+    let audioMix = null, exportClock = null;
+
+    function ensureAudio() {
+      if (audioMix) return audioMix;
+      const c = new (window.AudioContext || window.webkitAudioContext)();
+      const src = c.createMediaElementSource(musicEl);
+      const gain = c.createGain(), monitor = c.createGain(), dest = c.createMediaStreamDestination();
+      src.connect(gain); gain.connect(monitor); monitor.connect(c.destination); gain.connect(dest);
+      audioMix = { ctx: c, gain, monitor, dest };
+      return audioMix;
+    }
+
+    function syncMusic() {
+      if (!music.loaded || !audioMix) return;
+      const live = !!demoSource || !(video.duration && isFinite(video.duration));
+      const playing = state.hasVideo && (demoSource ? !demoPaused : (!video.paused && !video.ended));
+      if (playing && musicEl.paused) { audioMix.ctx.resume(); musicEl.play().catch(() => {}); }
+      else if (!playing && !musicEl.paused) musicEl.pause();
+
+      let pos = null, total = null;
+      if (exportClock) { pos = exportClock.pos; total = exportClock.total; }
+      else if (!live) { pos = video.currentTime; total = video.duration; }
+
+      const dur = musicEl.duration;
+      if (playing && !live && dur && isFinite(dur)) {
+        const target = music.loop ? video.currentTime % dur : video.currentTime;
+        if (!music.loop && video.currentTime >= dur) musicEl.pause();
+        else if (Math.abs(musicEl.currentTime - target) > 0.4) musicEl.currentTime = target;
+      }
+
+      let g = music.vol;
+      if (pos !== null && total) {
+        if (music.fadeIn > 0) g *= Math.min(1, pos / music.fadeIn);
+        if (music.fadeOut > 0) g *= Math.min(1, Math.max(0, (total - pos) / music.fadeOut));
+      }
+      audioMix.gain.gain.setTargetAtTime(g, audioMix.ctx.currentTime, 0.02);
+    }
+
+    const musicControls = document.getElementById('musicControls');
+    function setMusicLoaded(on, name) {
+      music.loaded = on;
+      document.getElementById('musicFileName').textContent = on ? name : 'No track selected';
+      document.getElementById('clearMusicBtn').classList.toggle('hidden', !on);
+      musicControls.classList.toggle('opacity-50', !on);
+      musicControls.classList.toggle('pointer-events-none', !on);
+    }
+    document.getElementById('musicFileInput').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      if (music.url) URL.revokeObjectURL(music.url);
+      music.url = URL.createObjectURL(f);
+      musicEl.src = music.url;
+      musicEl.loop = music.loop;
+      ensureAudio();
+      setMusicLoaded(true, f.name);
+      showToast('Music added');
+    });
+    document.getElementById('clearMusicBtn').addEventListener('click', () => {
+      musicEl.pause();
+      musicEl.removeAttribute('src');
+      musicEl.load();
+      if (music.url) URL.revokeObjectURL(music.url);
+      music.url = null;
+      document.getElementById('musicFileInput').value = '';
+      setMusicLoaded(false);
+    });
+    [['musicVolume', 'vol', 100, '%', 1], ['musicFadeIn', 'fadeIn', 1, 's', 1], ['musicFadeOut', 'fadeOut', 1, 's', 1]].forEach(([id, key, div, unit]) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        music[key] = parseFloat(e.target.value) / div;
+        setText(document.getElementById(id + 'Val'), e.target.value + unit);
+      });
+    });
+    document.getElementById('musicLoop').addEventListener('change', (e) => {
+      music.loop = e.target.checked;
+      musicEl.loop = music.loop;
     });
 
     const bgHints = {
